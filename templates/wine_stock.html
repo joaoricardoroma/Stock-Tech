@@ -20,6 +20,9 @@
         <button class="btn-glass" onclick="openModal('addPurchaseModal')" id="btnRecordPurchase">
             <i class="fas fa-plus-circle" style="color: var(--accent-green);"></i> Record Purchase
         </button>
+        <button class="btn-glass" onclick="openModal('addSupplierModal')" id="btnAddSupplier">
+            <i class="fas fa-truck" style="color: var(--accent-gold);"></i> Add Supplier
+        </button>
         <button class="btn-accent" onclick="openModal('addWineModal')" id="btnAddWine">
             <i class="fas fa-wine-bottle"></i> Add Wine
         </button>
@@ -54,11 +57,11 @@
                 <div class="day-card-date">{{ day.date_formatted }}</div>
                 <div class="day-card-stats">
                     <div class="day-stat">
-                        <span class="stat-value sold">{{ day.total_sold }}</span>
+                        <span class="stat-value sold-green">{{ day.total_sold }}</span>
                         <span class="stat-label">sold</span>
                     </div>
                     <div class="day-stat">
-                        <span class="stat-value ordered">+{{ day.total_ordered }}</span>
+                        <span class="stat-value ordered-red">+{{ day.total_ordered }}</span>
                         <span class="stat-label">ordered</span>
                     </div>
                 </div>
@@ -81,85 +84,7 @@
     </div>
 </section>
 
-<!-- ================================================================== -->
-<!-- SECTION 5: WINE ANALYSIS (KPI METRICS) - Placed above for impact  -->
-<!-- ================================================================== -->
-<section class="dashboard-section animate-in animate-delay-2" id="sectionKPIs">
-    <div class="section-header">
-        <h2 class="section-title">
-            <span class="icon-badge" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
-                <i class="fas fa-analytics"></i>
-            </span>
-            Wine Analysis
-        </h2>
-        <span class="section-badge">This Month</span>
-    </div>
 
-    <div class="kpi-grid">
-        <div class="kpi-card" id="kpiStockValue">
-            <div class="kpi-icon" style="background: var(--accent-blue-dim); color: var(--accent-blue);">
-                <i class="fas fa-boxes-stacked"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Total Stock Value</span>
-                <span class="kpi-value" data-count="{{ kpis.total_stock_value }}">€0</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiRevenue">
-            <div class="kpi-icon" style="background: var(--accent-green-dim); color: var(--accent-green);">
-                <i class="fas fa-euro-sign"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Monthly Revenue</span>
-                <span class="kpi-value" data-count="{{ kpis.total_revenue }}">€0</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiProfit">
-            <div class="kpi-icon" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
-                <i class="fas fa-chart-line"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Monthly Profit</span>
-                <span class="kpi-value" data-count="{{ kpis.total_profit }}">€0</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiTopWine">
-            <div class="kpi-icon" style="background: var(--accent-wine-dim); color: var(--accent-wine);">
-                <i class="fas fa-trophy"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Top Performing Wine</span>
-                <span class="kpi-value-text">{{ kpis.top_wine }}</span>
-                <span class="kpi-sub">{{ kpis.top_wine_qty }} sold this month</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiMargin">
-            <div class="kpi-icon" style="background: var(--accent-amber-dim); color: var(--accent-amber);">
-                <i class="fas fa-percent"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Highest Margin Wine</span>
-                <span class="kpi-value-text">{{ kpis.highest_margin_wine }}</span>
-                <span class="kpi-sub">{{ kpis.highest_margin_pct }}% margin</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiLowStock">
-            <div class="kpi-icon" style="background: var(--accent-red-dim); color: var(--accent-red);">
-                <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Low Stock Alerts</span>
-                <span class="kpi-value" data-count="{{ kpis.low_stock_count }}">0</span>
-                <span class="kpi-sub">of {{ kpis.total_wines }} wines</span>
-            </div>
-        </div>
-    </div>
-</section>
 
 <!-- ================================================================== -->
 <!-- SECTION 4: WINE PURCHASING & ALERTS                                -->
@@ -320,7 +245,7 @@
         </div>
     </div>
 
-    <div class="table-scroll-wrapper">
+    <div class="table-scroll-wrapper table-fixed-height">
         <table class="wine-data-table" id="wineDataTable">
             <thead>
                 <tr>
@@ -373,6 +298,86 @@
 </section>
 
 <!-- ================================================================== -->
+<!-- SECTION 5: WINE ANALYSIS (KPI METRICS)                             -->
+<!-- ================================================================== -->
+<section class="dashboard-section animate-in animate-delay-4" id="sectionKPIs">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="icon-badge" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
+                <i class="fas fa-chart-line"></i>
+            </span>
+            Wine Analysis
+        </h2>
+        <span class="section-badge">This Month</span>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card" id="kpiStockValue">
+            <div class="kpi-icon" style="background: var(--accent-blue-dim); color: var(--accent-blue);">
+                <i class="fas fa-boxes-stacked"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Total Stock Value</span>
+                <span class="kpi-value" data-count="{{ kpis.total_stock_value }}">€0</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiRevenue">
+            <div class="kpi-icon" style="background: var(--accent-green-dim); color: var(--accent-green);">
+                <i class="fas fa-euro-sign"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Monthly Revenue</span>
+                <span class="kpi-value" data-count="{{ kpis.total_revenue }}">€0</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiProfit">
+            <div class="kpi-icon" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Monthly Profit</span>
+                <span class="kpi-value" data-count="{{ kpis.total_profit }}">€0</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiTopWine">
+            <div class="kpi-icon" style="background: var(--accent-wine-dim); color: var(--accent-wine);">
+                <i class="fas fa-trophy"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Top Performing Wine</span>
+                <span class="kpi-value-text">{{ kpis.top_wine }}</span>
+                <span class="kpi-sub">{{ kpis.top_wine_qty }} sold this month</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiMargin">
+            <div class="kpi-icon" style="background: var(--accent-amber-dim); color: var(--accent-amber);">
+                <i class="fas fa-percent"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Highest Margin Wine</span>
+                <span class="kpi-value-text">{{ kpis.highest_margin_wine }}</span>
+                <span class="kpi-sub">{{ kpis.highest_margin_pct }}% margin</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiLowStock">
+            <div class="kpi-icon" style="background: var(--accent-red-dim); color: var(--accent-red);">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Low Stock Alerts</span>
+                <span class="kpi-value" data-count="{{ kpis.low_stock_count }}">0</span>
+                <span class="kpi-sub">of {{ kpis.total_wines }} wines</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================================================================== -->
 <!-- SECTION 6: SUPPLIERS DIRECTORY                                     -->
 <!-- ================================================================== -->
 <section class="dashboard-section animate-in animate-delay-5" id="sectionSuppliers">
@@ -383,6 +388,9 @@
             </span>
             Suppliers Directory
         </h2>
+        <button class="btn-glass" onclick="openModal('addSupplierModal')" id="btnAddSupplierDir">
+            <i class="fas fa-plus" style="color: var(--accent-gold);"></i> Add Supplier
+        </button>
     </div>
 
     <div class="suppliers-grid" id="suppliersGrid">
@@ -639,6 +647,62 @@
             <button class="btn-glass" onclick="closeModal('editWineModal')">Cancel</button>
             <button class="btn-accent" onclick="submitEditWine()" id="submitEditWineBtn">
                 <i class="fas fa-save"></i> Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Supplier Modal -->
+<div class="modal-overlay" id="addSupplierModal">
+    <div class="modal-glass modal-lg">
+        <div class="modal-header">
+            <h3><i class="fas fa-truck" style="color: var(--accent-gold);"></i> Add New Supplier</h3>
+            <button class="modal-close" onclick="closeModal('addSupplierModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-form-grid">
+                <div class="form-group-modal full-width">
+                    <label>Supplier Name</label>
+                    <input type="text" id="newSupplierName" class="modal-input" placeholder="e.g. FEVBRE">
+                </div>
+                <div class="form-group-modal">
+                    <label>Contact Email</label>
+                    <input type="email" id="newSupplierEmail" class="modal-input" placeholder="orders@supplier.ie">
+                </div>
+                <div class="form-group-modal">
+                    <label>Contact Phone</label>
+                    <input type="text" id="newSupplierPhone" class="modal-input" placeholder="+353 1 234 5678">
+                </div>
+                <div class="form-group-modal">
+                    <label>WhatsApp Number</label>
+                    <input type="text" id="newSupplierWhatsapp" class="modal-input" placeholder="+353 87 123 4567">
+                </div>
+                <div class="form-group-modal">
+                    <label>Order Method</label>
+                    <select id="newSupplierMethod" class="modal-input">
+                        <option value="email">Email</option>
+                        <option value="phone">Phone</option>
+                        <option value="whatsapp">WhatsApp</option>
+                    </select>
+                </div>
+                <div class="form-group-modal">
+                    <label>Delivery Cutoff Time</label>
+                    <input type="text" id="newSupplierCutoff" class="modal-input" placeholder="14:00">
+                </div>
+                <div class="form-group-modal">
+                    <label>Typical Delivery Days</label>
+                    <input type="number" id="newSupplierDeliveryDays" class="modal-input" value="1" min="1">
+                </div>
+                <div class="form-group-modal">
+                    <label>Minimum Order Note</label>
+                    <input type="text" id="newSupplierMinOrder" class="modal-input" placeholder="e.g. Min 36 bottles">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-glass" onclick="closeModal('addSupplierModal')">Cancel</button>
+            <button class="btn-accent" onclick="submitNewSupplier()" id="submitNewSupplierBtn">
+                <i class="fas fa-plus"></i> Add Supplier
             </button>
         </div>
     </div>

@@ -166,12 +166,12 @@
     font-weight: 700;
 }
 
-.stat-value.sold {
-    color: var(--accent-red);
+.stat-value.sold-green {
+    color: var(--accent-green);
 }
 
-.stat-value.ordered {
-    color: var(--accent-green);
+.stat-value.ordered-red {
+    color: var(--accent-red);
 }
 
 .stat-label {
@@ -240,13 +240,13 @@
 }
 
 .day-wine-sold {
-    color: var(--accent-red);
+    color: var(--accent-green);
     font-weight: 600;
     font-size: 12px;
 }
 
 .day-wine-ordered {
-    color: var(--accent-green);
+    color: var(--accent-red);
     font-weight: 600;
     font-size: 12px;
 }
@@ -712,6 +712,17 @@
 
 .table-search-input::placeholder {
     color: var(--text-muted);
+}
+
+.table-fixed-height {
+    max-height: 480px;
+    overflow-y: auto;
+}
+
+.wine-data-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .table-scroll-wrapper {

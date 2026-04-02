@@ -282,6 +282,41 @@ async function submitNewWine() {
     }
 }
 
+async function submitNewSupplier() {
+    const name = document.getElementById('newSupplierName').value.trim();
+    if (!name) { showToast('Supplier name is required', 'warning'); return; }
+
+    const body = {
+        name,
+        contact_email: document.getElementById('newSupplierEmail').value.trim(),
+        contact_phone: document.getElementById('newSupplierPhone').value.trim(),
+        contact_whatsapp: document.getElementById('newSupplierWhatsapp').value.trim(),
+        order_method: document.getElementById('newSupplierMethod').value,
+        delivery_cutoff_time: document.getElementById('newSupplierCutoff').value.trim(),
+        typical_delivery_days: parseInt(document.getElementById('newSupplierDeliveryDays').value) || 1,
+        minimum_order_note: document.getElementById('newSupplierMinOrder').value.trim(),
+    };
+
+    try {
+        const resp = await fetch('/api/supplier', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        const data = await resp.json();
+        if (data.success) {
+            showToast(`${name} added successfully!`, 'success');
+            closeModal('addSupplierModal');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showToast(data.error || 'Failed', 'danger');
+        }
+    } catch (err) {
+        showToast('Network error', 'danger');
+    }
+}
+
 async function editWine(wineId) {
     try {
         const resp = await fetch(`/api/wine/${wineId}`);
