@@ -176,3 +176,8 @@ Thumbs.db
 
 # Project generated SQLite database
 *.db
+
+__pycache__
+instance
+venv
+.env
