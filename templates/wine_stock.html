@@ -1,0 +1,651 @@
+{% extends 'base.html' %}
+
+{% block title %}Wine Stock Dashboard — StockTech{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wine_stock.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header animate-in">
+    <div>
+        <h1 class="page-title"><i class="fas fa-chart-pie" style="color: var(--accent-gold); margin-right: 10px;"></i>Dashboard Stock</h1>
+        <p class="page-subtitle">Wine inventory, sales tracking & analytics</p>
+    </div>
+    <div class="header-actions">
+        <button class="btn-glass" onclick="openModal('addSaleModal')" id="btnRecordSale">
+            <i class="fas fa-minus-circle" style="color: var(--accent-red);"></i> Record Sale
+        </button>
+        <button class="btn-glass" onclick="openModal('addPurchaseModal')" id="btnRecordPurchase">
+            <i class="fas fa-plus-circle" style="color: var(--accent-green);"></i> Record Purchase
+        </button>
+        <button class="btn-accent" onclick="openModal('addWineModal')" id="btnAddWine">
+            <i class="fas fa-wine-bottle"></i> Add Wine
+        </button>
+    </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- SECTION 1: WEEKLY WINE SALES                                       -->
+<!-- ================================================================== -->
+<section class="dashboard-section animate-in animate-delay-1" id="sectionWeeklySales">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="icon-badge" style="background: var(--accent-blue-dim); color: var(--accent-blue);">
+                <i class="fas fa-calendar-week"></i>
+            </span>
+            Weekly Wine Sales
+        </h2>
+        <span class="section-badge">This Week</span>
+    </div>
+
+    <div class="weekly-cards-scroll">
+        <div class="weekly-cards-row" id="weeklyCardsRow">
+            {% for day in weekly_data %}
+            <div class="weekly-day-card {% if day.is_today %}today{% elif not day.is_past %}future{% endif %}"
+                 onclick="toggleDayDetail(this, {{ loop.index0 }})"
+                 data-day-index="{{ loop.index0 }}"
+                 id="dayCard{{ loop.index0 }}">
+                <div class="day-card-header">
+                    <span class="day-name">{{ day.day_name[:3] }}</span>
+                    {% if day.is_today %}<span class="today-badge">Today</span>{% endif %}
+                </div>
+                <div class="day-card-date">{{ day.date_formatted }}</div>
+                <div class="day-card-stats">
+                    <div class="day-stat">
+                        <span class="stat-value sold">{{ day.total_sold }}</span>
+                        <span class="stat-label">sold</span>
+                    </div>
+                    <div class="day-stat">
+                        <span class="stat-value ordered">+{{ day.total_ordered }}</span>
+                        <span class="stat-label">ordered</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Day Detail Panel (hidden by default) -->
+    <div class="day-detail-panel glass-card-no-hover" id="dayDetailPanel" style="display: none;">
+        <div class="day-detail-header">
+            <h3 id="dayDetailTitle">Monday — 01 Apr</h3>
+            <button class="btn-glass btn-sm" onclick="closeDayDetail()" id="closeDayDetailBtn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="day-detail-body" id="dayDetailBody">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SECTION 5: WINE ANALYSIS (KPI METRICS) - Placed above for impact  -->
+<!-- ================================================================== -->
+<section class="dashboard-section animate-in animate-delay-2" id="sectionKPIs">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="icon-badge" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
+                <i class="fas fa-analytics"></i>
+            </span>
+            Wine Analysis
+        </h2>
+        <span class="section-badge">This Month</span>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card" id="kpiStockValue">
+            <div class="kpi-icon" style="background: var(--accent-blue-dim); color: var(--accent-blue);">
+                <i class="fas fa-boxes-stacked"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Total Stock Value</span>
+                <span class="kpi-value" data-count="{{ kpis.total_stock_value }}">€0</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiRevenue">
+            <div class="kpi-icon" style="background: var(--accent-green-dim); color: var(--accent-green);">
+                <i class="fas fa-euro-sign"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Monthly Revenue</span>
+                <span class="kpi-value" data-count="{{ kpis.total_revenue }}">€0</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiProfit">
+            <div class="kpi-icon" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Monthly Profit</span>
+                <span class="kpi-value" data-count="{{ kpis.total_profit }}">€0</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiTopWine">
+            <div class="kpi-icon" style="background: var(--accent-wine-dim); color: var(--accent-wine);">
+                <i class="fas fa-trophy"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Top Performing Wine</span>
+                <span class="kpi-value-text">{{ kpis.top_wine }}</span>
+                <span class="kpi-sub">{{ kpis.top_wine_qty }} sold this month</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiMargin">
+            <div class="kpi-icon" style="background: var(--accent-amber-dim); color: var(--accent-amber);">
+                <i class="fas fa-percent"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Highest Margin Wine</span>
+                <span class="kpi-value-text">{{ kpis.highest_margin_wine }}</span>
+                <span class="kpi-sub">{{ kpis.highest_margin_pct }}% margin</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" id="kpiLowStock">
+            <div class="kpi-icon" style="background: var(--accent-red-dim); color: var(--accent-red);">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="kpi-info">
+                <span class="kpi-label">Low Stock Alerts</span>
+                <span class="kpi-value" data-count="{{ kpis.low_stock_count }}">0</span>
+                <span class="kpi-sub">of {{ kpis.total_wines }} wines</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SECTION 4: WINE PURCHASING & ALERTS                                -->
+<!-- ================================================================== -->
+{% if low_stock_wines or pending_purchases %}
+<section class="dashboard-section animate-in animate-delay-3" id="sectionAlerts">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="icon-badge" style="background: var(--accent-red-dim); color: var(--accent-red);">
+                <i class="fas fa-bell"></i>
+            </span>
+            Purchasing & Alerts
+        </h2>
+        <span class="section-badge alert-badge">{{ low_stock_wines|length }} alerts</span>
+    </div>
+
+    {% if low_stock_wines %}
+    <div class="alert-subtitle"><i class="fas fa-arrow-trend-down"></i> Low Stock — Reorder Required</div>
+    <div class="alert-cards-grid">
+        {% for wine in low_stock_wines %}
+        <div class="alert-card" id="alertCard{{ wine.id }}">
+            <div class="alert-card-top">
+                <div class="alert-wine-info">
+                    <span class="alert-wine-name">{{ wine.name }}</span>
+                    <span class="alert-stock-badge critical">
+                        {{ wine.current_stock_qty }} / {{ wine.minimum_stock_threshold }}
+                    </span>
+                </div>
+                <div class="alert-qty-needed">
+                    Order: <strong>{{ wine.minimum_stock_threshold - wine.current_stock_qty + 6 }}</strong>
+                </div>
+            </div>
+            <div class="alert-card-bottom">
+                <div class="alert-supplier">
+                    <i class="fas fa-truck"></i>
+                    {{ wine.supplier.name if wine.supplier else 'No supplier' }}
+                </div>
+                {% if wine.supplier %}
+                <div class="alert-contact-actions">
+                    {% if wine.supplier.contact_whatsapp %}
+                    <a href="https://wa.me/{{ wine.supplier.contact_whatsapp | replace('+','') | replace(' ','') }}"
+                       class="contact-icon whatsapp" target="_blank" title="WhatsApp">
+                        <i class="fab fa-whatsapp"></i>
+                    </a>
+                    {% endif %}
+                    {% if wine.supplier.contact_email %}
+                    <a href="mailto:{{ wine.supplier.contact_email }}?subject=Wine Order — {{ wine.name }}"
+                       class="contact-icon email" title="Email">
+                        <i class="fas fa-envelope"></i>
+                    </a>
+                    {% endif %}
+                    {% if wine.supplier.contact_phone %}
+                    <a href="tel:{{ wine.supplier.contact_phone }}"
+                       class="contact-icon phone" title="Call">
+                        <i class="fas fa-phone"></i>
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% if wine.supplier and wine.supplier.delivery_cutoff_time %}
+            <div class="alert-cutoff">
+                <i class="fas fa-clock"></i> Cutoff: {{ wine.supplier.delivery_cutoff_time }} for next-day delivery
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if pending_purchases %}
+    <div class="alert-subtitle" style="margin-top: 28px;"><i class="fas fa-file-invoice"></i> Pending Invoices</div>
+    <div class="pending-invoices-list">
+        {% for purchase in pending_purchases %}
+        <div class="pending-invoice-row" id="pendingInvoice{{ purchase.id }}">
+            <div class="invoice-wine-info">
+                <span class="invoice-wine-name">{{ purchase.wine.name }}</span>
+                <span class="invoice-date">Ordered {{ purchase.date_ordered.strftime('%d %b %Y') }}</span>
+            </div>
+            <div class="invoice-qty">
+                <span class="qty-badge">+{{ purchase.quantity_ordered }}</span>
+            </div>
+            <button class="btn-clear-invoice"
+                    onclick="clearInvoice({{ purchase.id }}, this)"
+                    id="clearInvoiceBtn{{ purchase.id }}">
+                <i class="fas fa-check"></i> Clear Invoice
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<!-- ================================================================== -->
+<!-- SECTION 3: VISUAL STOCK (QUICK GLANCE)                             -->
+<!-- ================================================================== -->
+<section class="dashboard-section animate-in animate-delay-3" id="sectionVisualStock">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="icon-badge" style="background: var(--accent-green-dim); color: var(--accent-green);">
+                <i class="fas fa-wine-bottle"></i>
+            </span>
+            Visual Stock
+        </h2>
+        <div class="stock-filter-group">
+            <input type="text" class="stock-search-input" placeholder="Search wines..."
+                   oninput="filterStockCards(this.value)" id="stockSearchInput">
+            <div class="stock-filter-pills">
+                <button class="filter-pill active" onclick="filterByStatus('all', this)" id="filterAll">All</button>
+                <button class="filter-pill" onclick="filterByStatus('low', this)" id="filterLow">Low</button>
+                <button class="filter-pill" onclick="filterByStatus('ok', this)" id="filterOk">In Stock</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="visual-stock-grid" id="visualStockGrid">
+        {% for wine in wines %}
+        <div class="stock-card {% if wine.current_stock_qty < wine.minimum_stock_threshold %}stock-critical{% elif wine.current_stock_qty <= wine.minimum_stock_threshold + 2 %}stock-low{% else %}stock-ok{% endif %}"
+             data-wine-name="{{ wine.name | lower }}"
+             data-wine-status="{% if wine.current_stock_qty < wine.minimum_stock_threshold %}low{% else %}ok{% endif %}"
+             id="stockCard{{ wine.id }}">
+            <div class="stock-card-icon">
+                <i class="fas fa-wine-bottle"></i>
+            </div>
+            <div class="stock-card-qty">{{ wine.current_stock_qty }}</div>
+            <div class="stock-card-name">{{ wine.name }}</div>
+            <div class="stock-card-meta">
+                <div class="meta-row">
+                    <i class="fas fa-clock"></i>
+                    <span>Last sold: {{ wine.last_sold_date }}</span>
+                </div>
+                <div class="meta-row">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>This month: {{ wine.monthly_sold }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SECTION 2: MAIN WINE INFO DATABASE                                 -->
+<!-- ================================================================== -->
+<section class="dashboard-section animate-in animate-delay-4" id="sectionWineDatabase">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="icon-badge" style="background: var(--accent-wine-dim); color: var(--accent-wine);">
+                <i class="fas fa-database"></i>
+            </span>
+            Wine Database
+        </h2>
+        <div class="table-search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" class="table-search-input" placeholder="Search database..."
+                   oninput="filterWineTable(this.value)" id="wineTableSearch">
+        </div>
+    </div>
+
+    <div class="table-scroll-wrapper">
+        <table class="wine-data-table" id="wineDataTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)" class="sortable" id="thWineName">Wine Name <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(1)" class="sortable th-num" id="thCostPrice">Cost Price <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(2)" class="sortable th-num" id="thGlasses">Glasses/btl <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(3)" class="sortable th-num" id="thStockValue">Stock Value <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(4)" class="sortable" id="thSupplier">Supplier <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(5)" class="sortable th-num" id="thMargin">Margin % <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(6)" class="sortable th-num" id="thNetVat">NET VAT <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(7)" class="sortable th-num" id="thRetail">Retail Price <i class="fas fa-sort"></i></th>
+                    <th onclick="sortTable(8)" class="sortable th-num" id="thStock">Stock <i class="fas fa-sort"></i></th>
+                    <th id="thActions">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="wineTableBody">
+                {% for wine in wines %}
+                <tr data-wine-id="{{ wine.id }}" id="wineRow{{ wine.id }}">
+                    <td class="td-name">
+                        <div class="wine-name-cell">
+                            <span class="wine-dot {% if wine.current_stock_qty < wine.minimum_stock_threshold %}dot-red{% elif wine.current_stock_qty <= wine.minimum_stock_threshold + 2 %}dot-amber{% else %}dot-green{% endif %}"></span>
+                            {{ wine.name }}
+                        </div>
+                    </td>
+                    <td class="td-num">€{{ '%.2f' | format(wine.cost_price) }}</td>
+                    <td class="td-num">{{ wine.glasses_per_bottle }}</td>
+                    <td class="td-num">€{{ '%.2f' | format(wine.stock_value) }}</td>
+                    <td class="td-supplier">{{ wine.supplier_name }}</td>
+                    <td class="td-num">
+                        <span class="margin-badge">{{ wine.target_margin_percent }}%</span>
+                    </td>
+                    <td class="td-num">€{{ '%.2f' | format(wine.net_vat_price or 0) }}</td>
+                    <td class="td-num">€{{ '%.2f' | format(wine.retail_price or 0) }}</td>
+                    <td class="td-num">
+                        <span class="stock-num {% if wine.current_stock_qty < wine.minimum_stock_threshold %}stock-num-critical{% endif %}">
+                            {{ wine.current_stock_qty }}
+                        </span>
+                    </td>
+                    <td class="td-actions">
+                        <button class="btn-table-action" onclick="editWine({{ wine.id }})" title="Edit"
+                                id="editWineBtn{{ wine.id }}">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- SECTION 6: SUPPLIERS DIRECTORY                                     -->
+<!-- ================================================================== -->
+<section class="dashboard-section animate-in animate-delay-5" id="sectionSuppliers">
+    <div class="section-header">
+        <h2 class="section-title">
+            <span class="icon-badge" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
+                <i class="fas fa-address-book"></i>
+            </span>
+            Suppliers Directory
+        </h2>
+    </div>
+
+    <div class="suppliers-grid" id="suppliersGrid">
+        {% for supplier in suppliers %}
+        <div class="supplier-card glass-card" id="supplierCard{{ supplier.id }}">
+            <div class="supplier-card-header">
+                <div class="supplier-name-group">
+                    <h3 class="supplier-name">{{ supplier.name }}</h3>
+                    {% if supplier.minimum_order_note %}
+                    <span class="supplier-min-order">{{ supplier.minimum_order_note }}</span>
+                    {% endif %}
+                </div>
+                <div class="supplier-method-badge method-{{ supplier.order_method }}">
+                    {% if supplier.order_method == 'whatsapp' %}
+                        <i class="fab fa-whatsapp"></i>
+                    {% elif supplier.order_method == 'phone' %}
+                        <i class="fas fa-phone"></i>
+                    {% else %}
+                        <i class="fas fa-envelope"></i>
+                    {% endif %}
+                    {{ supplier.order_method | capitalize }}
+                </div>
+            </div>
+
+            <div class="supplier-contact-list">
+                {% if supplier.contact_email %}
+                <div class="supplier-contact-item">
+                    <i class="fas fa-envelope"></i>
+                    <a href="mailto:{{ supplier.contact_email }}">{{ supplier.contact_email }}</a>
+                </div>
+                {% endif %}
+                {% if supplier.contact_phone %}
+                <div class="supplier-contact-item">
+                    <i class="fas fa-phone"></i>
+                    <a href="tel:{{ supplier.contact_phone }}">{{ supplier.contact_phone }}</a>
+                </div>
+                {% endif %}
+                {% if supplier.contact_whatsapp %}
+                <div class="supplier-contact-item">
+                    <i class="fab fa-whatsapp"></i>
+                    <a href="https://wa.me/{{ supplier.contact_whatsapp | replace('+','') | replace(' ','') }}" target="_blank">{{ supplier.contact_whatsapp }}</a>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="supplier-delivery">
+                {% if supplier.delivery_cutoff_time %}
+                <span class="delivery-info">
+                    <i class="fas fa-clock"></i> Cutoff: {{ supplier.delivery_cutoff_time }}
+                </span>
+                {% endif %}
+                <span class="delivery-info">
+                    <i class="fas fa-truck"></i> {{ supplier.typical_delivery_days }} day{{ 's' if supplier.typical_delivery_days != 1 else '' }} delivery
+                </span>
+            </div>
+
+            <div class="supplier-wines-list">
+                {% set supplier_wines = wines | selectattr('supplier_name', 'equalto', supplier.name) | list %}
+                {% if supplier_wines %}
+                <div class="wines-list-header" onclick="this.parentElement.classList.toggle('expanded')">
+                    <span><i class="fas fa-wine-bottle"></i> {{ supplier_wines | length }} Wines</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="wines-list-items">
+                    {% for wine in supplier_wines %}
+                    <div class="wine-list-item">
+                        <span class="wine-dot {% if wine.current_stock_qty < wine.minimum_stock_threshold %}dot-red{% else %}dot-green{% endif %}"></span>
+                        {{ wine.name }}
+                        <span class="wine-list-qty">{{ wine.current_stock_qty }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="wines-list-header">
+                    <span><i class="fas fa-wine-bottle"></i> No wines listed</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- MODALS                                                              -->
+<!-- ================================================================== -->
+
+<!-- Record Sale Modal -->
+<div class="modal-overlay" id="addSaleModal">
+    <div class="modal-glass">
+        <div class="modal-header">
+            <h3><i class="fas fa-minus-circle" style="color: var(--accent-red);"></i> Record Sale</h3>
+            <button class="modal-close" onclick="closeModal('addSaleModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group-modal">
+                <label>Wine</label>
+                <select id="saleWineSelect" class="modal-input">
+                    {% for wine in wines %}
+                    <option value="{{ wine.id }}">{{ wine.name }} (Stock: {{ wine.current_stock_qty }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group-modal">
+                <label>Quantity Sold</label>
+                <input type="number" id="saleQuantity" class="modal-input" value="1" min="1">
+            </div>
+            <div class="form-group-modal">
+                <label>Date</label>
+                <input type="date" id="saleDate" class="modal-input" value="{{ today }}">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-glass" onclick="closeModal('addSaleModal')">Cancel</button>
+            <button class="btn-accent" onclick="submitSale()" id="submitSaleBtn">
+                <i class="fas fa-check"></i> Record Sale
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Record Purchase Modal -->
+<div class="modal-overlay" id="addPurchaseModal">
+    <div class="modal-glass">
+        <div class="modal-header">
+            <h3><i class="fas fa-plus-circle" style="color: var(--accent-green);"></i> Record Purchase</h3>
+            <button class="modal-close" onclick="closeModal('addPurchaseModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group-modal">
+                <label>Wine</label>
+                <select id="purchaseWineSelect" class="modal-input">
+                    {% for wine in wines %}
+                    <option value="{{ wine.id }}">{{ wine.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group-modal">
+                <label>Quantity Ordered</label>
+                <input type="number" id="purchaseQuantity" class="modal-input" value="6" min="1">
+            </div>
+            <div class="form-group-modal">
+                <label>Date Ordered</label>
+                <input type="date" id="purchaseDate" class="modal-input" value="{{ today }}">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-glass" onclick="closeModal('addPurchaseModal')">Cancel</button>
+            <button class="btn-accent" onclick="submitPurchase()" id="submitPurchaseBtn">
+                <i class="fas fa-check"></i> Record Purchase
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Wine Modal -->
+<div class="modal-overlay" id="addWineModal">
+    <div class="modal-glass modal-lg">
+        <div class="modal-header">
+            <h3><i class="fas fa-wine-bottle" style="color: var(--accent-gold);"></i> Add New Wine</h3>
+            <button class="modal-close" onclick="closeModal('addWineModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-form-grid">
+                <div class="form-group-modal full-width">
+                    <label>Wine Name</label>
+                    <input type="text" id="newWineName" class="modal-input" placeholder="e.g. Chablis le Verger">
+                </div>
+                <div class="form-group-modal">
+                    <label>Supplier</label>
+                    <select id="newWineSupplier" class="modal-input">
+                        <option value="">Select supplier</option>
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group-modal">
+                    <label>Cost Price (€)</label>
+                    <input type="number" id="newWineCost" class="modal-input" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group-modal">
+                    <label>Glasses per Bottle</label>
+                    <input type="number" id="newWineGlasses" class="modal-input" value="5" min="1">
+                </div>
+                <div class="form-group-modal">
+                    <label>Target Margin %</label>
+                    <input type="number" id="newWineMargin" class="modal-input" value="70" min="0" max="100">
+                </div>
+                <div class="form-group-modal">
+                    <label>Min Stock Threshold</label>
+                    <input type="number" id="newWineThreshold" class="modal-input" value="3" min="0">
+                </div>
+                <div class="form-group-modal">
+                    <label>Initial Stock Qty</label>
+                    <input type="number" id="newWineStock" class="modal-input" value="0" min="0">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-glass" onclick="closeModal('addWineModal')">Cancel</button>
+            <button class="btn-accent" onclick="submitNewWine()" id="submitNewWineBtn">
+                <i class="fas fa-plus"></i> Add Wine
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Wine Modal -->
+<div class="modal-overlay" id="editWineModal">
+    <div class="modal-glass modal-lg">
+        <div class="modal-header">
+            <h3><i class="fas fa-pen" style="color: var(--accent-blue);"></i> Edit Wine</h3>
+            <button class="modal-close" onclick="closeModal('editWineModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editWineId">
+            <div class="modal-form-grid">
+                <div class="form-group-modal full-width">
+                    <label>Wine Name</label>
+                    <input type="text" id="editWineName" class="modal-input">
+                </div>
+                <div class="form-group-modal">
+                    <label>Supplier</label>
+                    <select id="editWineSupplier" class="modal-input">
+                        {% for supplier in suppliers %}
+                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group-modal">
+                    <label>Cost Price (€)</label>
+                    <input type="number" id="editWineCost" class="modal-input" step="0.01">
+                </div>
+                <div class="form-group-modal">
+                    <label>Glasses per Bottle</label>
+                    <input type="number" id="editWineGlasses" class="modal-input" min="1">
+                </div>
+                <div class="form-group-modal">
+                    <label>Target Margin %</label>
+                    <input type="number" id="editWineMargin" class="modal-input" min="0" max="100">
+                </div>
+                <div class="form-group-modal">
+                    <label>Min Stock Threshold</label>
+                    <input type="number" id="editWineThreshold" class="modal-input" min="0">
+                </div>
+                <div class="form-group-modal">
+                    <label>Current Stock</label>
+                    <input type="number" id="editWineCurrentStock" class="modal-input" min="0">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-glass" onclick="closeModal('editWineModal')">Cancel</button>
+            <button class="btn-accent" onclick="submitEditWine()" id="submitEditWineBtn">
+                <i class="fas fa-save"></i> Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Weekly data JSON for JS -->
+<script id="weeklyDataJSON" type="application/json">{{ weekly_data | tojson | safe }}</script>
+
+<script src="{{ url_for('static', filename='js/wine_stock.js') }}"></script>
+{% endblock %}
