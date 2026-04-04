@@ -6,6 +6,12 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/wine_stock.css') }}">
 {% endblock %}
 
+{% block extra_scripts %}
+<!-- jsPDF + html2canvas for client-side PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <!-- Page Header -->
 <div class="page-header animate-in">
@@ -39,8 +45,19 @@
                 <i class="fas fa-calendar-week"></i>
             </span>
             Weekly Wine Sales
+            <span class="week-label-text" id="weekLabelDisplay">{{ week_label }}</span>
         </h2>
-        <span class="section-badge">This Week</span>
+        <div class="week-nav-group">
+            <a href="?week_offset={{ week_offset - 1 }}" class="btn-glass btn-week-nav" id="btnPrevWeek" title="Previous Week">
+                <i class="fas fa-chevron-left"></i> Prev
+            </a>
+            <button class="btn-glass btn-pdf-week" onclick="downloadWeeklyPDF()" id="btnDownloadWeekPDF">
+                <i class="fas fa-file-pdf" style="color: var(--accent-red);"></i> Download PDF
+            </button>
+            <a href="?week_offset={{ week_offset + 1 }}" class="btn-glass btn-week-nav" id="btnNextWeek" title="Next Week">
+                Next <i class="fas fa-chevron-right"></i>
+            </a>
+        </div>
     </div>
 
     <div class="weekly-cards-scroll">
@@ -168,9 +185,9 @@
                 <span class="qty-badge">+{{ purchase.quantity_ordered }}</span>
             </div>
             <button class="btn-clear-invoice"
-                    onclick="clearInvoice({{ purchase.id }}, this)"
+                    onclick="openClearInvoiceModal({{ purchase.id }}, '{{ purchase.wine.name }}', {{ purchase.quantity_ordered }})"
                     id="clearInvoiceBtn{{ purchase.id }}">
-                <i class="fas fa-check"></i> Clear Invoice
+                <i class="fas fa-camera"></i> Clear Invoice
             </button>
         </div>
         {% endfor %}
@@ -258,6 +275,7 @@
                     <th onclick="sortTable(6)" class="sortable th-num" id="thNetVat">NET VAT <i class="fas fa-sort"></i></th>
                     <th onclick="sortTable(7)" class="sortable th-num" id="thRetail">Retail Price <i class="fas fa-sort"></i></th>
                     <th onclick="sortTable(8)" class="sortable th-num" id="thStock">Stock <i class="fas fa-sort"></i></th>
+                    <th id="thInvoices">Invoices</th>
                     <th id="thActions">Actions</th>
                 </tr>
             </thead>
@@ -285,6 +303,14 @@
                         </span>
                     </td>
                     <td class="td-actions">
+                        <button class="btn-table-action btn-invoice-gallery {% if wine.invoice_count == 0 %}btn-invoice-empty{% endif %}"
+                                onclick="openInvoiceGallery({{ wine.id }}, '{{ wine.name }}')"
+                                title="View Invoices ({{ wine.invoice_count }})" id="invoiceGalleryBtn{{ wine.id }}">
+                            <i class="fas fa-receipt"></i>
+                            {% if wine.invoice_count > 0 %}
+                            <span class="invoice-count-badge">{{ wine.invoice_count }}</span>
+                            {% endif %}
+                        </button>
                         <button class="btn-table-action" onclick="editWine({{ wine.id }})" title="Edit"
                                 id="editWineBtn{{ wine.id }}">
                             <i class="fas fa-pen"></i>
@@ -308,7 +334,9 @@
             </span>
             Wine Analysis
         </h2>
-        <span class="section-badge">This Month</span>
+        <button class="btn-glass btn-pdf-month" onclick="downloadMonthlyPDF()" id="btnDownloadMonthPDF">
+            <i class="fas fa-file-pdf" style="color: var(--accent-red);"></i> Download Month PDF
+        </button>
     </div>
 
     <div class="kpi-grid">
@@ -708,8 +736,64 @@
     </div>
 </div>
 
+<!-- Clear Invoice Modal (with photo upload) -->
+<div class="modal-overlay" id="clearInvoiceModal">
+    <div class="modal-glass">
+        <div class="modal-header">
+            <h3><i class="fas fa-camera" style="color: var(--accent-gold);"></i> Clear Invoice</h3>
+            <button class="modal-close" onclick="closeModal('clearInvoiceModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="clearInvoicePurchaseId">
+            <div style="text-align:center; margin-bottom: 16px;">
+                <p id="clearInvoiceDesc" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;"></p>
+                <div class="invoice-upload-zone" id="invoiceUploadZone" onclick="document.getElementById('invoiceImageInput').click()">
+                    <div class="upload-placeholder" id="uploadPlaceholder">
+                        <i class="fas fa-camera" style="font-size: 36px; color: var(--accent-gold); margin-bottom: 10px;"></i>
+                        <p style="font-weight: 600;">Tap to take photo or upload</p>
+                        <p style="font-size: 12px; color: var(--text-muted);">JPG, PNG, PDF, HEIC up to 16 MB</p>
+                    </div>
+                    <img id="invoicePreview" src="" alt="Invoice Preview"
+                         style="display:none; max-width:100%; max-height: 280px; border-radius: 10px; object-fit: contain;">
+                </div>
+                <input type="file" id="invoiceImageInput" accept="image/*,application/pdf"
+                       capture="environment" style="display:none;"
+                       onchange="previewInvoiceImage(this)">
+                <button class="btn-glass" style="margin-top: 10px; font-size: 12px;"
+                        onclick="document.getElementById('invoiceImageInput').click()" id="changePhotoBtn">
+                    <i class="fas fa-redo"></i> Change Photo
+                </button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-glass" onclick="closeModal('clearInvoiceModal')">Cancel</button>
+            <button class="btn-accent" onclick="submitClearInvoice()" id="submitClearInvoiceBtn">
+                <i class="fas fa-check"></i> Confirm &amp; Add to Stock
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Invoice Gallery Modal -->
+<div class="modal-overlay" id="invoiceGalleryModal">
+    <div class="modal-glass modal-lg">
+        <div class="modal-header">
+            <h3><i class="fas fa-receipt" style="color: var(--accent-gold);"></i>
+                Invoices — <span id="galleryWineName"></span></h3>
+            <button class="modal-close" onclick="closeModal('invoiceGalleryModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="invoiceGalleryGrid" class="invoice-gallery-grid">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Weekly data JSON for JS -->
 <script id="weeklyDataJSON" type="application/json">{{ weekly_data | tojson | safe }}</script>
+<script id="weekOffsetJSON" type="application/json">{{ week_offset | tojson | safe }}</script>
+<script id="weekLabelJSON" type="application/json">{{ week_label | tojson | safe }}</script>
 
 <script src="{{ url_for('static', filename='js/wine_stock.js') }}"></script>
 {% endblock %}

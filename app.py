@@ -4,8 +4,15 @@ Main app with routes, API endpoints, and authentication.
 """
 
 import os
+import io
+import uuid
 from datetime import datetime, date, timedelta
 from functools import wraps
+from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+from PIL import Image
+
+load_dotenv()
 
 from flask import (
     Flask, render_template, request, jsonify, redirect,
@@ -25,10 +32,30 @@ from models import db, User, Supplier, Wine, WineSale, WinePurchase
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'wine-stock-secret-key-2026')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///wine_stock.db'
+
+# Use Neon PostgreSQL from .env, fall back to local SQLite for dev
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:///wine_stock.db')
+# Ensure SQLAlchemy accepts the postgresql:// URI from Neon
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
+
+# Invoice image upload config
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'invoices')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp', 'heic'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 db.init_app(app)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -85,15 +112,20 @@ def index():
 @app.route('/wine-stock')
 @login_required
 def wine_stock():
-    """Main wine stock dashboard.  Gathers all data for the template."""
+    # Week navigation via ?week_offset=N (0=this week, -1=last, +1=next)
+    try:
+        week_offset = int(request.args.get('week_offset', 0))
+    except (ValueError, TypeError):
+        week_offset = 0
 
     wines = Wine.query.order_by(Wine.name).all()
     suppliers = Supplier.query.order_by(Supplier.name).all()
 
-    # --- Weekly Sales Data (Mon-Sun of current week) ---
+    # --- Weekly Sales Data (Mon-Sun of selected week) ---
     today = date.today()
-    monday = today - timedelta(days=today.weekday())  # Monday of this week
+    monday = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
     sunday = monday + timedelta(days=6)
+    week_label = f"{monday.strftime('%d %b')} – {sunday.strftime('%d %b %Y')}"
 
     weekly_sales = WineSale.query.filter(
         WineSale.date >= monday,
@@ -211,6 +243,20 @@ def wine_stock():
         'total_wines': len(wines),
     }
 
+    # invoice counts per wine for gallery column
+    invoice_counts = {}
+    for wine in wines:
+        count = WinePurchase.query.filter_by(
+            wine_id=wine.id,
+            is_invoice_cleared=True
+        ).filter(WinePurchase.invoice_image_path.isnot(None)).count()
+        invoice_counts[wine.id] = count
+
+    # Add invoice_count into wines_data
+    for w in wines_data:
+        w['invoice_count'] = invoice_counts.get(w['id'], 0)
+
+
     return render_template('wine_stock.html',
                            wines=wines_data,
                            suppliers=suppliers,
@@ -218,7 +264,9 @@ def wine_stock():
                            pending_purchases=pending_purchases,
                            low_stock_wines=low_stock_wines,
                            kpis=kpis,
-                           today=today.isoformat())
+                           today=today.isoformat(),
+                           week_offset=week_offset,
+                           week_label=week_label)
 
 
 # ---------------------------------------------------------------------------
@@ -278,14 +326,56 @@ def record_purchase():
 def clear_invoice(purchase_id):
     """
     Mark a purchase invoice as cleared.
-    CRITICAL: This is the ONLY place where purchased quantity
-    gets added to Wine.current_stock_qty.
+    REQUIRES: A photo/scan of the invoice uploaded as multipart form field 'invoice_image'.
+    CRITICAL: This is the ONLY place where purchased quantity gets added to Wine.current_stock_qty.
     """
     purchase = WinePurchase.query.get_or_404(purchase_id)
 
     if purchase.is_invoice_cleared:
         return jsonify({'error': 'Invoice already cleared'}), 400
 
+    # Require invoice image
+    if 'invoice_image' not in request.files:
+        return jsonify({'error': 'Invoice image is required to clear this invoice.'}), 400
+
+    file = request.files['invoice_image']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({'error': 'Please upload a valid image or PDF (jpg, png, gif, pdf, webp).'}), 400
+
+    # Save file with unique name — compress images using Pillow
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
+
+    if is_image:
+        # Always save compressed images as JPEG
+        unique_name = f"invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.jpg"
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        try:
+            img = Image.open(file.stream)
+            # Convert to RGB (handles RGBA, palette, HEIC, etc.)
+            if img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
+            # Resize if wider than 1200px, maintain aspect ratio
+            max_width = 1200
+            if img.width > max_width:
+                ratio = max_width / img.width
+                new_size = (max_width, int(img.height * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
+            # Save compressed JPEG (quality 75 — good quality, ~80% smaller)
+            img.save(save_path, format='JPEG', quality=75, optimize=True)
+        except Exception as compress_err:
+            # Fall back to saving the original if Pillow fails
+            app.logger.warning(f'Pillow compression failed: {compress_err}, saving original')
+            file.seek(0)
+            file.save(save_path)
+    else:
+        # PDFs saved as-is
+        unique_name = f"invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.{ext}"
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        file.save(save_path)
+
+    purchase.invoice_image_path = f"uploads/invoices/{unique_name}"
+    purchase.invoice_image_original = secure_filename(file.filename)
     purchase.is_invoice_cleared = True
     purchase.date_cleared = datetime.utcnow()
 
@@ -299,6 +389,119 @@ def clear_invoice(purchase_id):
         'success': True,
         'new_stock': wine.current_stock_qty,
         'purchase': purchase.to_dict()
+    })
+
+
+@app.route('/api/wine/<int:wine_id>/invoices')
+@login_required
+def get_wine_invoices(wine_id):
+    """Get all cleared invoices with images for a wine."""
+    purchases = WinePurchase.query.filter_by(
+        wine_id=wine_id,
+        is_invoice_cleared=True
+    ).filter(
+        WinePurchase.invoice_image_path.isnot(None)
+    ).order_by(WinePurchase.date_cleared.desc()).all()
+
+    invoices = []
+    for p in purchases:
+        invoices.append({
+            'id': p.id,
+            'date_ordered': p.date_ordered.isoformat(),
+            'date_cleared': p.date_cleared.isoformat() if p.date_cleared else None,
+            'quantity_ordered': p.quantity_ordered,
+            'image_url': f"/static/{p.invoice_image_path}",
+            'image_original': p.invoice_image_original,
+        })
+
+    return jsonify({'invoices': invoices, 'wine_id': wine_id})
+
+
+@app.route('/api/monthly-report-data')
+@login_required
+def monthly_report_data():
+    """Return full month breakdown for PDF generation."""
+    today = date.today()
+    first_of_month = today.replace(day=1)
+
+    # All sales and purchases this month
+    month_sales = WineSale.query.filter(WineSale.date >= first_of_month).all()
+    month_purchases = WinePurchase.query.filter(WinePurchase.date_ordered >= first_of_month).all()
+    wines = Wine.query.order_by(Wine.name).all()
+
+    # Build week-by-week data for this month
+    # Find all Mon–Sun weeks that overlap the month
+    weeks = []
+    # Start from the Monday of the week containing first_of_month
+    wk_start = first_of_month - timedelta(days=first_of_month.weekday())
+    while wk_start <= today:
+        wk_end = wk_start + timedelta(days=6)
+        wk_sales = [s for s in month_sales if wk_start <= s.date <= wk_end]
+        wk_purchases = [p for p in month_purchases if wk_start <= p.date_ordered <= wk_end]
+
+        days = []
+        for i in range(7):
+            d = wk_start + timedelta(days=i)
+            d_sales = [s for s in wk_sales if s.date == d]
+            d_purchases = [p for p in wk_purchases if p.date_ordered == d]
+            wine_details = {}
+            for s in d_sales:
+                wn = s.wine.name if s.wine else 'Unknown'
+                wine_details.setdefault(wn, {'sold': 0, 'ordered': 0})
+                wine_details[wn]['sold'] += s.quantity_sold
+            for p in d_purchases:
+                wn = p.wine.name if p.wine else 'Unknown'
+                wine_details.setdefault(wn, {'sold': 0, 'ordered': 0})
+                wine_details[wn]['ordered'] += p.quantity_ordered
+            days.append({
+                'date': d.isoformat(),
+                'day_name': d.strftime('%A'),
+                'date_formatted': d.strftime('%d %b'),
+                'total_sold': sum(s.quantity_sold for s in d_sales),
+                'total_ordered': sum(p.quantity_ordered for p in d_purchases),
+                'wine_details': wine_details,
+            })
+
+        weeks.append({
+            'label': f"{wk_start.strftime('%d %b')} – {wk_end.strftime('%d %b')}",
+            'start': wk_start.isoformat(),
+            'end': wk_end.isoformat(),
+            'days': days,
+            'total_sold': sum(d['total_sold'] for d in days),
+            'total_ordered': sum(d['total_ordered'] for d in days),
+        })
+        wk_start += timedelta(weeks=1)
+
+    # Per-wine monthly summary
+    wine_summary = []
+    for wine in wines:
+        sold = sum(s.quantity_sold for s in month_sales if s.wine_id == wine.id)
+        ordered = sum(p.quantity_ordered for p in month_purchases if p.wine_id == wine.id)
+        revenue = (wine.retail_price or 0) * sold
+        cost = wine.cost_price * sold
+        if sold > 0 or ordered > 0:
+            wine_summary.append({
+                'name': wine.name,
+                'sold': sold,
+                'ordered': ordered,
+                'revenue': round(revenue, 2),
+                'profit': round(revenue - cost, 2),
+                'current_stock': wine.current_stock_qty,
+            })
+
+    return jsonify({
+        'month_label': today.strftime('%B %Y'),
+        'generated_at': datetime.now().strftime('%d %b %Y %H:%M'),
+        'weeks': weeks,
+        'wine_summary': sorted(wine_summary, key=lambda x: x['sold'], reverse=True),
+        'kpis': {
+            'total_sold': sum(s.quantity_sold for s in month_sales),
+            'total_ordered': sum(p.quantity_ordered for p in month_purchases),
+            'total_revenue': round(sum(
+                (w.retail_price or 0) * sum(s.quantity_sold for s in month_sales if s.wine_id == w.id)
+                for w in wines
+            ), 2),
+        }
     })
 
 

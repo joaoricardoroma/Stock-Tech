@@ -194,6 +194,25 @@
             flex-shrink: 0;
         }
 
+        .sidebar-nav .nav-link-soon {
+            opacity: 0.35;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .soon-badge {
+            margin-left: auto;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
         .sidebar-footer {
             padding: 16px;
             border-top: 1px solid var(--glass-border);
@@ -480,40 +499,42 @@
                 <i class="fas fa-wine-glass-alt"></i>
             </div>
             <div class="brand-text">Stock<span>Tech</span></div>
-        </div>
-
-        <div class="sidebar-nav">
+        </div>        <div class="sidebar-nav">
             <div class="nav-label">Management</div>
             <div class="nav-item">
-                <a href="{{ url_for('wine_stock') }}" class="nav-link {% if request.endpoint == 'wine_stock' %}active{% endif %}" id="nav-dashboard">
-                    <i class="fas fa-chart-pie"></i>
-                    <span>Dashboard Stock</span>
-                </a>
-            </div>
-            <div class="nav-item">
-                <a href="#" class="nav-link" id="nav-wines">
+                <a href="{{ url_for('wine_stock') }}" class="nav-link active" id="nav-wines">
                     <i class="fas fa-wine-bottle"></i>
                     <span>Wines</span>
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link" id="nav-bar">
-                    <i class="fas fa-glass-martini-alt"></i>
-                    <span>Bar</span>
+                <a href="#" class="nav-link nav-link-soon" id="nav-dashboard" tabindex="-1" onclick="return false;">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Dashboard Stock</span>
+                    <span class="soon-badge">Soon</span>
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link" id="nav-invoices">
+                <a href="#" class="nav-link nav-link-soon" id="nav-bar" tabindex="-1" onclick="return false;">
+                    <i class="fas fa-glass-martini-alt"></i>
+                    <span>Bar</span>
+                    <span class="soon-badge">Soon</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a href="#" class="nav-link nav-link-soon" id="nav-invoices" tabindex="-1" onclick="return false;">
                     <i class="fas fa-file-invoice-dollar"></i>
-                    <span>Invoices & Statements</span>
+                    <span>Invoices &amp; Statements</span>
+                    <span class="soon-badge">Soon</span>
                 </a>
             </div>
 
             <div class="nav-label">Settings</div>
             <div class="nav-item">
-                <a href="#" class="nav-link" id="nav-settings">
+                <a href="#" class="nav-link nav-link-soon" id="nav-settings" tabindex="-1" onclick="return false;">
                     <i class="fas fa-cog"></i>
                     <span>Settings</span>
+                    <span class="soon-badge">Soon</span>
                 </a>
             </div>
         </div>

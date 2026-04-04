@@ -155,6 +155,8 @@ class WinePurchase(db.Model):
     quantity_ordered = db.Column(db.Integer, nullable=False, default=1)
     is_invoice_cleared = db.Column(db.Boolean, nullable=False, default=False)
     date_cleared = db.Column(db.DateTime, nullable=True)
+    invoice_image_path = db.Column(db.String(500), nullable=True)       # stored file path
+    invoice_image_original = db.Column(db.String(300), nullable=True)   # original filename
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -170,4 +172,6 @@ class WinePurchase(db.Model):
             'quantity_ordered': self.quantity_ordered,
             'is_invoice_cleared': self.is_invoice_cleared,
             'date_cleared': self.date_cleared.isoformat() if self.date_cleared else None,
+            'invoice_image_path': self.invoice_image_path,
+            'invoice_image_original': self.invoice_image_original,
         }
