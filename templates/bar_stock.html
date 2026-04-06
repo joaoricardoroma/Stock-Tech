@@ -3,369 +3,1267 @@
 
 {% block extra_styles %}
 <style>
-/* ===== BAR MODULE — TEAL ACCENT PALETTE ===== */
-:root {
-  --bar-teal:       #00d4aa;
-  --bar-teal-dim:   rgba(0,212,170,0.10);
-  --bar-teal-glow:  rgba(0,212,170,0.25);
-  --bar-coral:      #fb7185;
-  --bar-coral-dim:  rgba(251,113,133,0.10);
-  --bar-amber:      #fbbf24;
-  --bar-amber-dim:  rgba(251,191,36,0.10);
-  --bar-blue:       #60a5fa;
-  --bar-blue-dim:   rgba(96,165,250,0.10);
-  --bar-green:      #34d399;
-  --bar-green-dim:  rgba(52,211,153,0.10);
-  --bar-purple:     #a78bfa;
-  --bar-purple-dim: rgba(167,139,250,0.10);
-}
+  /* ===== BAR MODULE — TEAL ACCENT PALETTE ===== */
+  :root {
+    --bar-teal: #00d4aa;
+    --bar-teal-dim: rgba(0, 212, 170, 0.10);
+    --bar-teal-glow: rgba(0, 212, 170, 0.25);
+    --bar-coral: #fb7185;
+    --bar-coral-dim: rgba(251, 113, 133, 0.10);
+    --bar-amber: #fbbf24;
+    --bar-amber-dim: rgba(251, 191, 36, 0.10);
+    --bar-blue: #60a5fa;
+    --bar-blue-dim: rgba(96, 165, 250, 0.10);
+    --bar-green: #34d399;
+    --bar-green-dim: rgba(52, 211, 153, 0.10);
+    --bar-purple: #a78bfa;
+    --bar-purple-dim: rgba(167, 139, 250, 0.10);
+  }
 
-/* ===== CATEGORY CHIPS ===== */
-.cat-chip {
-  display: inline-flex; align-items: center;
-  padding: 3px 10px; border-radius: 20px; font-size: 11px;
-  font-weight: 600; text-transform: capitalize; border: 1px solid transparent;
-}
-.cat-vodka   { background: var(--bar-blue-dim);   color: var(--bar-blue);   border-color: rgba(96,165,250,0.25); }
-.cat-tequila { background: var(--bar-amber-dim);  color: var(--bar-amber);  border-color: rgba(251,191,36,0.25); }
-.cat-rum     { background: var(--bar-green-dim);  color: var(--bar-green);  border-color: rgba(52,211,153,0.25); }
-.cat-gin     { background: var(--bar-purple-dim); color: var(--bar-purple); border-color: rgba(167,139,250,0.25); }
-.cat-whiskey { background: var(--bar-coral-dim);  color: var(--bar-coral);  border-color: rgba(251,113,133,0.25); }
-.cat-brandy  { background: rgba(251,146,60,0.10); color: #fb923c;           border-color: rgba(251,146,60,0.25); }
-.cat-liqueur { background: var(--bar-teal-dim);   color: var(--bar-teal);   border-color: rgba(0,212,170,0.25); }
-.cat-other   { background: var(--glass-bg);       color: var(--text-secondary); border-color: var(--glass-border); }
+  /* ===== CATEGORY CHIPS ===== */
+  .cat-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+    border: 1px solid transparent;
+  }
 
-/* ===== KPI STRIP ===== */
-.bar-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px; margin-bottom: 24px;
-}
-.bar-kpi-card {
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  border-radius: var(--glass-radius); padding: 16px 18px;
-  position: relative; overflow: hidden; transition: all .25s;
-}
-.bar-kpi-card::before {
-  content:''; position:absolute; top:0; left:0; right:0; height:2px;
-  background: var(--kc, var(--bar-teal));
-}
-.bar-kpi-card:hover { transform: translateY(-2px); }
-.bar-kpi-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted); margin-bottom:6px; }
-.bar-kpi-value { font-family:'Outfit',sans-serif; font-size:24px; font-weight:700; color:var(--kc, var(--bar-teal)); line-height:1; }
-.bar-kpi-sub   { font-size:11px; color:var(--text-muted); margin-top:3px; }
+  .cat-vodka {
+    background: var(--bar-blue-dim);
+    color: var(--bar-blue);
+    border-color: rgba(96, 165, 250, 0.25);
+  }
 
-/* ===== WEEKLY CALENDAR ===== */
-.week-nav-row { display:flex; align-items:center; gap:10px; }
-.week-nav-btn {
-  width:34px; height:34px; border-radius:8px; border:1px solid var(--glass-border);
-  background:var(--glass-bg); color:var(--text-primary); display:flex; align-items:center;
-  justify-content:center; cursor:pointer; transition:all .2s; text-decoration:none; font-size:13px;
-}
-.week-nav-btn:hover { background:var(--bar-teal-dim); border-color:var(--bar-teal-glow); color:var(--bar-teal); }
-.week-lbl { font-weight:600; font-size:13px; color:var(--text-secondary); }
+  .cat-tequila {
+    background: var(--bar-amber-dim);
+    color: var(--bar-amber);
+    border-color: rgba(251, 191, 36, 0.25);
+  }
 
-.day-cards-row {
-  display: grid;
-  grid-template-columns: repeat(7,1fr);
-  gap: 8px; margin-top:14px;
-}
-@media(max-width:900px){ .day-cards-row { grid-template-columns: repeat(3,1fr); } }
-@media(max-width:560px){ .day-cards-row { grid-template-columns: repeat(2,1fr); } }
+  .cat-rum {
+    background: var(--bar-green-dim);
+    color: var(--bar-green);
+    border-color: rgba(52, 211, 153, 0.25);
+  }
 
-.bar-day-card {
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  border-radius: 12px; padding: 14px 10px; cursor: pointer;
-  transition: all .2s; text-align: center;
-}
-.bar-day-card:hover   { background:var(--glass-bg-hover); border-color:var(--glass-border-hover); }
-.bar-day-card.today   { border-color:rgba(0,212,170,.4); background:var(--bar-teal-dim); }
-.bar-day-card.has-data{ border-color:rgba(0,212,170,.2); }
-.bdc-name { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--text-muted); }
-.bdc-date { font-family:'Outfit',sans-serif; font-size:18px; font-weight:700; margin:4px 0; }
-.bdc-rev  { font-size:12px; font-weight:600; color:var(--bar-teal); }
-.bdc-units{ font-size:11px; color:var(--text-muted); }
-.today-badge-sm { font-size:9px; background:var(--bar-teal); color:#000; border-radius:4px; padding:1px 5px; font-weight:700; margin-left:4px; }
+  .cat-gin {
+    background: var(--bar-purple-dim);
+    color: var(--bar-purple);
+    border-color: rgba(167, 139, 250, 0.25);
+  }
 
-.day-detail-panel {
-  margin-top: 12px; padding: 18px 20px;
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  border-radius: var(--glass-radius); display: none;
-}
-.day-detail-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
-.day-detail-header h3 { font-size:15px; font-weight:600; }
+  .cat-whiskey {
+    background: var(--bar-coral-dim);
+    color: var(--bar-coral);
+    border-color: rgba(251, 113, 133, 0.25);
+  }
 
-/* ===== ALERT CARDS (low stock spirits) ===== */
-.alert-cards-grid {
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-top:14px;
-}
-.alert-card {
-  background:var(--glass-bg); border:1px solid rgba(251,113,133,.25);
-  border-radius:12px; padding:14px 16px;
-}
-.alert-spirit-name  { font-weight:600; font-size:14px; }
-.alert-stock-badge  { font-size:11px; background:var(--bar-coral-dim); color:var(--bar-coral); border-radius:6px; padding:2px 8px; font-weight:600; }
-.alert-qty-row      { margin-top:6px; font-size:12px; color:var(--text-muted); }
-.alert-contact-row  { display:flex; gap:6px; margin-top:10px; }
-.contact-icon-sm {
-  width:30px; height:30px; border-radius:8px; display:flex; align-items:center;
-  justify-content:center; text-decoration:none; font-size:13px; border:1px solid var(--glass-border);
-  background:var(--glass-bg); color:var(--text-secondary); transition:all .2s;
-}
-.contact-icon-sm:hover { transform:scale(1.1); }
-.contact-icon-sm.wa    { background:rgba(37,211,102,.12); border-color:rgba(37,211,102,.25); color:#25d366; }
-.contact-icon-sm.em    { background:var(--bar-blue-dim); border-color:rgba(96,165,250,.25); color:var(--bar-blue); }
-.contact-icon-sm.ph    { background:var(--bar-green-dim); border-color:rgba(52,211,153,.25); color:var(--bar-green); }
+  .cat-brandy {
+    background: rgba(251, 146, 60, 0.10);
+    color: #fb923c;
+    border-color: rgba(251, 146, 60, 0.25);
+  }
 
-/* ===== PENDING INVOICES ===== */
-.pending-inv-row {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:12px 16px; background:var(--glass-bg); border:1px solid var(--glass-border);
-  border-radius:10px; margin-bottom:8px;
-}
-.inv-spirit-name { font-weight:600; font-size:14px; }
-.inv-date        { font-size:11px; color:var(--text-muted); }
-.inv-qty-badge   { background:var(--bar-green-dim); color:var(--bar-green); border-radius:6px; padding:3px 10px; font-size:12px; font-weight:700; }
+  .cat-liqueur {
+    background: var(--bar-teal-dim);
+    color: var(--bar-teal);
+    border-color: rgba(0, 212, 170, 0.25);
+  }
 
-/* ===== VISUAL STOCK ===== */
-.visual-stock-grid {
-  display:grid; grid-template-columns: repeat(auto-fill,minmax(130px,1fr));
-  gap:12px; margin-top:14px;
-}
-.vis-card {
-  background:var(--glass-bg); border:1px solid var(--glass-border);
-  border-radius:12px; padding:16px 12px; text-align:center; transition:all .2s;
-  position:relative; overflow:hidden;
-}
-.vis-card:hover { transform:translateY(-2px); border-color:var(--glass-border-hover); }
-.vis-card.stock-critical { border-color:rgba(251,113,133,.35); }
-.vis-card.stock-low      { border-color:rgba(251,191,36,.35); }
-.vis-card.stock-ok       { border-color:rgba(52,211,153,.15); }
+  .cat-other {
+    background: var(--glass-bg);
+    color: var(--text-secondary);
+    border-color: var(--glass-border);
+  }
 
-.bottle-visual {
-  width:36px; height:70px; margin:0 auto 8px;
-  border:2px solid var(--glass-border); border-radius:4px 4px 8px 8px;
-  position:relative; overflow:hidden; background:rgba(255,255,255,.04);
-}
-.bottle-fill {
-  position:absolute; bottom:0; left:0; right:0;
-  background:linear-gradient(0deg, var(--bar-teal), rgba(0,212,170,.5));
-  transition:height .6s ease;
-}
-.bottle-fill.low  { background:linear-gradient(0deg, var(--bar-coral), rgba(251,113,133,.5)); }
-.bottle-fill.warn { background:linear-gradient(0deg, var(--bar-amber), rgba(251,191,36,.5)); }
+  /* ===== KPI STRIP ===== */
+  .bar-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
 
-.vis-card-name { font-size:11px; font-weight:600; color:var(--text-secondary); line-height:1.3; margin-bottom:4px; }
-.vis-card-measures { font-family:'Outfit',sans-serif; font-size:15px; font-weight:700; color:var(--bar-teal); }
-.vis-card-sub { font-size:10px; color:var(--text-muted); }
-.vis-status-dot {
-  width:7px; height:7px; border-radius:50%; margin:5px auto 0; display:block;
-}
-.dot-green { background:var(--bar-green); }
-.dot-amber { background:var(--bar-amber); }
-.dot-red   { background:var(--bar-coral); }
+  .bar-kpi-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--glass-radius);
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: all .25s;
+  }
 
-/* ===== SPIRITS TABLE ===== */
-.spirits-table-wrap { overflow-x:auto; }
-.spirits-table { width:100%; border-collapse:separate; border-spacing:0 5px; }
-.spirits-table thead th {
-  font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px;
-  color:var(--text-muted); padding:8px 12px; border-bottom:1px solid var(--glass-border);
-  white-space:nowrap;
-}
-.spirits-table tbody tr {
-  background:var(--glass-bg); transition:all .2s; border-radius:10px;
-}
-.spirits-table tbody tr:hover { background:var(--glass-bg-hover); }
-.spirits-table tbody td { padding:10px 12px; font-size:13px; }
-.spirits-table tbody td:first-child { border-radius:10px 0 0 10px; }
-.spirits-table tbody td:last-child  { border-radius:0 10px 10px 0; }
-.spirit-name-cell { display:flex; align-items:center; gap:8px; }
-.spirit-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.td-num { text-align:right; font-family:'Outfit',sans-serif; }
-.margin-badge {
-  background:var(--bar-green-dim); color:var(--bar-green);
-  border-radius:6px; padding:2px 7px; font-size:11px; font-weight:700;
-}
-.stock-measures-badge {
-  font-family:'Outfit',sans-serif; font-weight:700; font-size:13px;
-}
-.stock-measures-badge.critical { color:var(--bar-coral); }
-.stock-measures-badge.low      { color:var(--bar-amber); }
-.stock-measures-badge.ok       { color:var(--bar-green); }
-.btn-tbl { background:none; border:1px solid var(--glass-border); color:var(--text-secondary); border-radius:7px; width:30px; height:30px; cursor:pointer; transition:all .2s; font-size:12px; }
-.btn-tbl:hover { background:var(--bar-teal-dim); border-color:var(--bar-teal-glow); color:var(--bar-teal); }
-.btn-tbl.del:hover { background:var(--bar-coral-dim); border-color:rgba(251,113,133,.3); color:var(--bar-coral); }
+  .bar-kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--kc, var(--bar-teal));
+  }
 
-/* ===== RECIPE CARDS ===== */
-.recipe-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px; margin-top:14px; }
-.recipe-card {
-  background:var(--glass-bg); border:1px solid var(--glass-border);
-  border-radius:14px; padding:18px; transition:all .2s;
-}
-.recipe-card:hover { border-color:rgba(0,212,170,.3); transform:translateY(-2px); }
-.recipe-name { font-weight:700; font-size:15px; margin-bottom:4px; }
-.recipe-desc { font-size:12px; color:var(--text-muted); margin-bottom:12px; }
-.recipe-ings { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px; }
-.ing-pill {
-  font-size:11px; padding:3px 9px; border-radius:20px; font-weight:500;
-  background:var(--glass-bg); border:1px solid var(--glass-border); color:var(--text-secondary);
-}
-.ing-pill.spirit-pill { background:var(--bar-teal-dim); border-color:rgba(0,212,170,.25); color:var(--bar-teal); }
-.recipe-footer { display:flex; justify-content:space-between; align-items:center; padding-top:10px; border-top:1px solid var(--glass-border); }
-.recipe-price { font-family:'Outfit',sans-serif; font-size:18px; font-weight:700; color:var(--bar-teal); }
-.recipe-cost  { font-size:11px; color:var(--text-muted); }
-.recipe-margin{ font-size:11px; color:var(--bar-green); font-weight:600; }
-.btn-sell { background:var(--bar-teal-dim); border:1px solid rgba(0,212,170,.3); color:var(--bar-teal); border-radius:8px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; }
-.btn-sell:hover { background:var(--bar-teal); color:#000; }
+  .bar-kpi-card:hover {
+    transform: translateY(-2px);
+  }
 
-/* ===== SUB-INGREDIENTS REGISTRY ===== */
-.sub-ing-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; margin-top:14px; }
-.sub-ing-card {
-  background:var(--glass-bg); border:1px solid var(--glass-border);
-  border-radius:10px; padding:12px 14px; transition:all .2s;
-  display:flex; justify-content:space-between; align-items:center;
-}
-.sub-ing-card:hover { border-color:var(--glass-border-hover); }
-.sub-ing-name { font-weight:600; font-size:13px; }
-.sub-ing-meta { font-size:11px; color:var(--text-muted); }
+  .bar-kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
 
-/* ===== ANALYSIS KPIs ===== */
-.an-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
-.an-kpi-card { background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:12px; padding:16px 18px; }
-.an-kpi-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--text-muted); margin-bottom:6px; }
-.an-kpi-val   { font-family:'Outfit',sans-serif; font-size:22px; font-weight:700; }
+  .bar-kpi-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--kc, var(--bar-teal));
+    line-height: 1;
+  }
 
-.analysis-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-.analysis-bar-label { font-size:12px; width:150px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.analysis-bar-track { flex:1; height:6px; background:var(--glass-bg); border-radius:3px; overflow:hidden; }
-.analysis-bar-fill  { height:100%; background:var(--bar-teal); border-radius:3px; transition:width .6s ease; }
-.analysis-bar-val   { font-size:12px; font-weight:600; width:60px; text-align:right; }
+  .bar-kpi-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
 
-/* ===== ALERT SUBTITLE ===== */
-.section-alert-sub { font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:10px; display:flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:.5px; }
+  /* ===== WEEKLY CALENDAR ===== */
+  .week-nav-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
-/* ===== SECTION COMMON ===== */
-.bar-section { margin-bottom: 40px; }
-.dashboard-section { margin-bottom: 40px !important; }
-.section-header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
-.section-title-bar { display:flex; align-items:center; gap:10px; }
-.section-icon { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
-.section-h2 { font-size:17px; font-weight:700; }
-.section-badge { font-size:11px; font-weight:600; padding:3px 10px; border-radius:10px; }
-.badge-teal   { background:var(--bar-teal-dim);  color:var(--bar-teal); }
-.badge-red    { background:var(--bar-coral-dim); color:var(--bar-coral); }
-.badge-green  { background:var(--bar-green-dim); color:var(--bar-green); }
-.badge-amber  { background:var(--bar-amber-dim); color:var(--bar-amber); }
+  .week-nav-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all .2s;
+    text-decoration: none;
+    font-size: 13px;
+  }
 
-/* ===== WEEKLY CARDS SCROLL (wine-page style) ===== */
-.weekly-cards-scroll { overflow-x: auto; padding-bottom: 6px; }
-.weekly-cards-row { display:flex; gap:8px; min-width:max-content; }
-.weekly-day-card {
-  background:var(--glass-bg); border:1px solid var(--glass-border);
-  border-radius:12px; padding:14px 12px; cursor:pointer;
-  transition:all .2s; text-align:center; min-width:100px;
-}
-.weekly-day-card:hover   { background:var(--glass-bg-hover); border-color:var(--glass-border-hover); }
-.weekly-day-card.today   { border-color:rgba(0,212,170,.4); background:var(--bar-teal-dim); }
-.weekly-day-card.has-data{ border-color:rgba(0,212,170,.2); }
-.wdc-name { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--text-muted); }
-.wdc-date { font-family:'Outfit',sans-serif; font-size:18px; font-weight:700; margin:4px 0; }
-.wdc-rev  { font-size:13px; font-weight:600; color:var(--bar-teal); }
-.wdc-units{ font-size:11px; color:var(--text-muted); }
-.wdc-waste{ font-size:11px; color:var(--bar-coral); }
-.today-badge-mini { font-size:9px; background:var(--bar-teal); color:#000; border-radius:4px; padding:1px 5px; font-weight:700; display:block; margin-bottom:2px; }
+  .week-nav-btn:hover {
+    background: var(--bar-teal-dim);
+    border-color: var(--bar-teal-glow);
+    color: var(--bar-teal);
+  }
 
-/* ===== FIXED SEARCH INPUT IN TABLE ===== */
-.table-search-wrapper { position:relative; display:flex; align-items:center; }
-.table-search-wrapper i { position:absolute; left:10px; color:var(--text-muted); font-size:12px; pointer-events:none; }
-.table-search-wrapper .table-search-input { padding-left:30px; }
+  .week-lbl {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
 
-/* ===== FORM ELEMENTS — dark glass ===== */
-.form-control-glass, .form-select-glass,
-select.form-select-glass, input.form-control-glass {
-  background: #0d1117 !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--glass-border);
-  border-radius: 9px; padding: 9px 12px; font-size: 13px;
-  transition: border .2s; outline: none;
-  width: 100%;
-}
-.form-control-glass:focus, .form-select-glass:focus {
-  border-color: rgba(0,212,170,.45);
-  box-shadow: 0 0 0 3px rgba(0,212,170,.08);
-}
-select.form-select-glass option {
-  background: #0d1117 !important;
-  color: var(--text-primary) !important;
-}
+  .day-cards-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
 
-/* ===== ANALYSIS ENHANCED ===== */
-.analysis-kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:24px; }
-.an-kpi-pill {
-  background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:12px;
-  padding:14px 16px; text-align:center;
-}
-.an-kpi-pill-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:5px; }
-.an-kpi-pill-val { font-family:'Outfit',sans-serif; font-size:22px; font-weight:700; }
-.an-kpi-pill-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
-.analysis-charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
-@media(max-width:700px){ .analysis-charts-grid { grid-template-columns:1fr; } }
-.analysis-section-card {
-  background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:12px; padding:16px;
-}
-.analysis-section-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  @media(max-width:900px) {
+    .day-cards-row {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
 
-/* ===== WASTE SECTION btns ===== */
-.btn-bar-primary {
-  background: linear-gradient(135deg, var(--bar-teal), #009e80);
-  color: #000; border: none; border-radius: 10px; padding: 9px 18px;
-  font-size: 13px; font-weight: 700; cursor: pointer; transition: all .2s;
-  display: inline-flex; align-items: center; gap: 7px;
-}
-.btn-bar-primary:hover { transform:translateY(-1px); filter:brightness(1.1); }
+  @media(max-width:560px) {
+    .day-cards-row {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
 
-/* ===== MODALS — bar style using Bootstrap ===== */
-.modal-glass .modal-content {
-  background: var(--glass-bg-dark, #0d1117) !important;
-  border: 1px solid var(--glass-border) !important;
-  border-radius: 16px !important; color: var(--text-primary) !important;
-  backdrop-filter: blur(20px);
-}
-.modal-glass .modal-header {
-  border-bottom: 1px solid var(--glass-border) !important;
-  padding: 18px 22px 14px;
-}
-.modal-glass .modal-footer {
-  border-top: 1px solid var(--glass-border) !important;
-  padding: 14px 22px 18px;
-}
-.modal-glass .modal-body { padding: 18px 22px; }
-.form-label-sm { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:5px; display:block; }
-.form-control-glass, .form-select-glass {
-  width:100%; background:rgba(255,255,255,.04); border:1px solid var(--glass-border);
-  color:var(--text-primary); border-radius:9px; padding:9px 12px; font-size:13px;
-  transition:border .2s; outline:none; -webkit-appearance:none; appearance:none;
-}
-.form-control-glass:focus, .form-select-glass:focus { border-color:rgba(0,212,170,.4); }
-.form-row   { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
-.btn-modal-cancel { background:var(--glass-bg); border:1px solid var(--glass-border); color:var(--text-secondary); border-radius:9px; padding:8px 16px; font-size:13px; cursor:pointer; }
-.btn-modal-cancel:hover { border-color:var(--glass-border-hover); color:var(--text-primary); }
-.btn-modal-primary { background:var(--bar-teal); color:#000; border:none; border-radius:9px; padding:9px 20px; font-size:13px; font-weight:700; cursor:pointer; }
-.btn-modal-primary:hover { filter:brightness(1.1); }
-.btn-modal-danger { background:var(--bar-coral); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-size:13px; font-weight:700; cursor:pointer; }
+  .bar-day-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+  }
 
-/* Ingredient builder in recipe modal */
-.ing-builder-rows { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
-.ing-row { display:flex; align-items:center; gap:6px; }
-.ing-type-lbl { font-size:10px; font-weight:700; padding:3px 7px; border-radius:5px; white-space:nowrap; }
-.ing-lbl-spirit { background:var(--bar-teal-dim); color:var(--bar-teal); }
-.ing-lbl-mixer  { background:var(--bar-purple-dim); color:var(--bar-purple); }
-.ing-remove { background:none; border:1px solid var(--glass-border); color:var(--text-muted); border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:11px; }
-.ing-remove:hover { background:var(--bar-coral-dim); color:var(--bar-coral); border-color:rgba(251,113,133,.3); }
-.cost-preview { margin-top:8px; padding:8px 12px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:8px; font-size:12px; }
-.calc-preview-box { margin-top:10px; padding:9px 13px; background:var(--bar-teal-dim); border:1px solid rgba(0,212,170,.2); border-radius:9px; font-size:12px; display:none; }
+  .bar-day-card:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--glass-border-hover);
+  }
+
+  .bar-day-card.today {
+    border-color: rgba(0, 212, 170, .4);
+    background: var(--bar-teal-dim);
+  }
+
+  .bar-day-card.has-data {
+    border-color: rgba(0, 212, 170, .2);
+  }
+
+  .bdc-name {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text-muted);
+  }
+
+  .bdc-date {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 4px 0;
+  }
+
+  .bdc-rev {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--bar-teal);
+  }
+
+  .bdc-units {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .today-badge-sm {
+    font-size: 9px;
+    background: var(--bar-teal);
+    color: #000;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+
+  .day-detail-panel {
+    margin-top: 12px;
+    padding: 18px 20px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--glass-radius);
+    display: none;
+  }
+
+  .day-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .day-detail-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  /* ===== ALERT CARDS (low stock spirits) ===== */
+  .alert-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .alert-card {
+    background: var(--glass-bg);
+    border: 1px solid rgba(251, 113, 133, .25);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+
+  .alert-spirit-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .alert-stock-badge {
+    font-size: 11px;
+    background: var(--bar-coral-dim);
+    color: var(--bar-coral);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-weight: 600;
+  }
+
+  .alert-qty-row {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .alert-contact-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .contact-icon-sm {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 13px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-secondary);
+    transition: all .2s;
+  }
+
+  .contact-icon-sm:hover {
+    transform: scale(1.1);
+  }
+
+  .contact-icon-sm.wa {
+    background: rgba(37, 211, 102, .12);
+    border-color: rgba(37, 211, 102, .25);
+    color: #25d366;
+  }
+
+  .contact-icon-sm.em {
+    background: var(--bar-blue-dim);
+    border-color: rgba(96, 165, 250, .25);
+    color: var(--bar-blue);
+  }
+
+  .contact-icon-sm.ph {
+    background: var(--bar-green-dim);
+    border-color: rgba(52, 211, 153, .25);
+    color: var(--bar-green);
+  }
+
+  /* ===== PENDING INVOICES ===== */
+  .pending-inv-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  .inv-spirit-name {
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .inv-date {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .inv-qty-badge {
+    background: var(--bar-green-dim);
+    color: var(--bar-green);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* ===== VISUAL STOCK ===== */
+  .visual-stock-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .vis-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 16px 12px;
+    text-align: center;
+    transition: all .2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .vis-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--glass-border-hover);
+  }
+
+  .vis-card.stock-critical {
+    border-color: rgba(251, 113, 133, .35);
+  }
+
+  .vis-card.stock-low {
+    border-color: rgba(251, 191, 36, .35);
+  }
+
+  .vis-card.stock-ok {
+    border-color: rgba(52, 211, 153, .15);
+  }
+
+  .bottle-visual {
+    width: 36px;
+    height: 70px;
+    margin: 0 auto 8px;
+    border: 2px solid var(--glass-border);
+    border-radius: 4px 4px 8px 8px;
+    position: relative;
+    overflow: hidden;
+    background: rgba(255, 255, 255, .04);
+  }
+
+  .bottle-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(0deg, var(--bar-teal), rgba(0, 212, 170, .5));
+    transition: height .6s ease;
+  }
+
+  .bottle-fill.low {
+    background: linear-gradient(0deg, var(--bar-coral), rgba(251, 113, 133, .5));
+  }
+
+  .bottle-fill.warn {
+    background: linear-gradient(0deg, var(--bar-amber), rgba(251, 191, 36, .5));
+  }
+
+  .vis-card-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    line-height: 1.3;
+    margin-bottom: 4px;
+  }
+
+  .vis-card-measures {
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--bar-teal);
+  }
+
+  .vis-card-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .vis-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin: 5px auto 0;
+    display: block;
+  }
+
+  .dot-green {
+    background: var(--bar-green);
+  }
+
+  .dot-amber {
+    background: var(--bar-amber);
+  }
+
+  .dot-red {
+    background: var(--bar-coral);
+  }
+
+  /* ===== SPIRITS TABLE ===== */
+  .spirits-table-wrap {
+    overflow-x: auto;
+  }
+
+  .spirits-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 5px;
+  }
+
+  .spirits-table thead th {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--glass-border);
+    white-space: nowrap;
+  }
+
+  .spirits-table tbody tr {
+    background: var(--glass-bg);
+    transition: all .2s;
+    border-radius: 10px;
+  }
+
+  .spirits-table tbody tr:hover {
+    background: var(--glass-bg-hover);
+  }
+
+  .spirits-table tbody td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .spirits-table tbody td:first-child {
+    border-radius: 10px 0 0 10px;
+  }
+
+  .spirits-table tbody td:last-child {
+    border-radius: 0 10px 10px 0;
+  }
+
+  .spirit-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .spirit-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .td-num {
+    text-align: right;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  .margin-badge {
+    background: var(--bar-green-dim);
+    color: var(--bar-green);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .stock-measures-badge {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .stock-measures-badge.critical {
+    color: var(--bar-coral);
+  }
+
+  .stock-measures-badge.low {
+    color: var(--bar-amber);
+  }
+
+  .stock-measures-badge.ok {
+    color: var(--bar-green);
+  }
+
+  .btn-tbl {
+    background: none;
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    border-radius: 7px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    transition: all .2s;
+    font-size: 12px;
+  }
+
+  .btn-tbl:hover {
+    background: var(--bar-teal-dim);
+    border-color: var(--bar-teal-glow);
+    color: var(--bar-teal);
+  }
+
+  .btn-tbl.del:hover {
+    background: var(--bar-coral-dim);
+    border-color: rgba(251, 113, 133, .3);
+    color: var(--bar-coral);
+  }
+
+  /* ===== RECIPE CARDS ===== */
+  .recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .recipe-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 18px;
+    transition: all .2s;
+  }
+
+  .recipe-card:hover {
+    border-color: rgba(0, 212, 170, .3);
+    transform: translateY(-2px);
+  }
+
+  .recipe-name {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .recipe-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .recipe-ings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 12px;
+  }
+
+  .ing-pill {
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-weight: 500;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+  }
+
+  .ing-pill.spirit-pill {
+    background: var(--bar-teal-dim);
+    border-color: rgba(0, 212, 170, .25);
+    color: var(--bar-teal);
+  }
+
+  .recipe-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 1px solid var(--glass-border);
+  }
+
+  .recipe-price {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--bar-teal);
+  }
+
+  .recipe-cost {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .recipe-margin {
+    font-size: 11px;
+    color: var(--bar-green);
+    font-weight: 600;
+  }
+
+  .btn-sell {
+    background: var(--bar-teal-dim);
+    border: 1px solid rgba(0, 212, 170, .3);
+    color: var(--bar-teal);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .btn-sell:hover {
+    background: var(--bar-teal);
+    color: #000;
+  }
+
+  /* ===== SUB-INGREDIENTS REGISTRY ===== */
+  .sub-ing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .sub-ing-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: all .2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sub-ing-card:hover {
+    border-color: var(--glass-border-hover);
+  }
+
+  .sub-ing-name {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .sub-ing-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ===== ANALYSIS KPIs ===== */
+  .an-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .an-kpi-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  .an-kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .an-kpi-val {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .analysis-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .analysis-bar-label {
+    font-size: 12px;
+    width: 150px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .analysis-bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--glass-bg);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .analysis-bar-fill {
+    height: 100%;
+    background: var(--bar-teal);
+    border-radius: 3px;
+    transition: width .6s ease;
+  }
+
+  .analysis-bar-val {
+    font-size: 12px;
+    font-weight: 600;
+    width: 60px;
+    text-align: right;
+  }
+
+  /* ===== ALERT SUBTITLE ===== */
+  .section-alert-sub {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  /* ===== SECTION COMMON ===== */
+  .bar-section {
+    margin-bottom: 40px;
+  }
+
+  .dashboard-section {
+    margin-bottom: 40px !important;
+  }
+
+  .section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .section-title-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .section-h2 {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .section-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+
+  .badge-teal {
+    background: var(--bar-teal-dim);
+    color: var(--bar-teal);
+  }
+
+  .badge-red {
+    background: var(--bar-coral-dim);
+    color: var(--bar-coral);
+  }
+
+  .badge-green {
+    background: var(--bar-green-dim);
+    color: var(--bar-green);
+  }
+
+  .badge-amber {
+    background: var(--bar-amber-dim);
+    color: var(--bar-amber);
+  }
+
+  /* ===== WEEKLY CARDS SCROLL (wine-page style) ===== */
+  .weekly-cards-scroll {
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+
+  .weekly-cards-row {
+    display: flex;
+    gap: 8px;
+    min-width: max-content;
+  }
+
+  .weekly-day-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 14px 12px;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+    min-width: 100px;
+  }
+
+  .weekly-day-card:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--glass-border-hover);
+  }
+
+  .weekly-day-card.today {
+    border-color: rgba(0, 212, 170, .4);
+    background: var(--bar-teal-dim);
+  }
+
+  .weekly-day-card.has-data {
+    border-color: rgba(0, 212, 170, .2);
+  }
+
+  .wdc-name {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text-muted);
+  }
+
+  .wdc-date {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 4px 0;
+  }
+
+  .wdc-rev {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bar-teal);
+  }
+
+  .wdc-units {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .wdc-waste {
+    font-size: 11px;
+    color: var(--bar-coral);
+  }
+
+  .today-badge-mini {
+    font-size: 9px;
+    background: var(--bar-teal);
+    color: #000;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-weight: 700;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  /* ===== FIXED SEARCH INPUT IN TABLE ===== */
+  .table-search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .table-search-wrapper i {
+    position: absolute;
+    left: 10px;
+    color: var(--text-muted);
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  .table-search-wrapper .table-search-input {
+    padding-left: 30px;
+  }
+
+  /* ===== FORM ELEMENTS — dark glass ===== */
+  .form-control-glass,
+  .form-select-glass,
+  select.form-select-glass,
+  input.form-control-glass {
+    background: #0d1117 !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--glass-border);
+    border-radius: 9px;
+    padding: 9px 12px;
+    font-size: 13px;
+    transition: border .2s;
+    outline: none;
+    width: 100%;
+  }
+
+  .form-control-glass:focus,
+  .form-select-glass:focus {
+    border-color: rgba(0, 212, 170, .45);
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, .08);
+  }
+
+  select.form-select-glass option {
+    background: #0d1117 !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* ===== ANALYSIS ENHANCED ===== */
+  .analysis-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .an-kpi-pill {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+
+  .an-kpi-pill-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+
+  .an-kpi-pill-val {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .an-kpi-pill-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .analysis-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media(max-width:700px) {
+    .analysis-charts-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .analysis-section-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .analysis-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ===== WASTE SECTION btns ===== */
+  .btn-bar-primary {
+    background: linear-gradient(135deg, var(--bar-teal), #009e80);
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .btn-bar-primary:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.1);
+  }
+
+  /* ===== MODALS — bar style using Bootstrap ===== */
+  .modal-glass .modal-content {
+    background: var(--glass-bg-dark, #0d1117) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 16px !important;
+    color: var(--text-primary) !important;
+    backdrop-filter: blur(20px);
+  }
+
+  .modal-glass .modal-header {
+    border-bottom: 1px solid var(--glass-border) !important;
+    padding: 18px 22px 14px;
+  }
+
+  .modal-glass .modal-footer {
+    border-top: 1px solid var(--glass-border) !important;
+    padding: 14px 22px 18px;
+  }
+
+  .modal-glass .modal-body {
+    padding: 18px 22px;
+  }
+
+  .form-label-sm {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+    display: block;
+  }
+
+  .form-control-glass,
+  .form-select-glass {
+    width: 100%;
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    border-radius: 9px;
+    padding: 9px 12px;
+    font-size: 13px;
+    transition: border .2s;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .form-control-glass:focus,
+  .form-select-glass:focus {
+    border-color: rgba(0, 212, 170, .4);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .form-row-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+
+  .btn-modal-cancel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    border-radius: 9px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .btn-modal-cancel:hover {
+    border-color: var(--glass-border-hover);
+    color: var(--text-primary);
+  }
+
+  .btn-modal-primary {
+    background: var(--bar-teal);
+    color: #000;
+    border: none;
+    border-radius: 9px;
+    padding: 9px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-modal-primary:hover {
+    filter: brightness(1.1);
+  }
+
+  .btn-modal-danger {
+    background: var(--bar-coral);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    padding: 9px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* Ingredient builder in recipe modal */
+  .ing-builder-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0;
+  }
+
+  .ing-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ing-type-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+
+  .ing-lbl-spirit {
+    background: var(--bar-teal-dim);
+    color: var(--bar-teal);
+  }
+
+  .ing-lbl-mixer {
+    background: var(--bar-purple-dim);
+    color: var(--bar-purple);
+  }
+
+  .ing-remove {
+    background: none;
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .ing-remove:hover {
+    background: var(--bar-coral-dim);
+    color: var(--bar-coral);
+    border-color: rgba(251, 113, 133, .3);
+  }
+
+  .cost-preview {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    font-size: 12px;
+  }
+
+  .calc-preview-box {
+    margin-top: 10px;
+    padding: 9px 13px;
+    background: var(--bar-teal-dim);
+    border: 1px solid rgba(0, 212, 170, .2);
+    border-radius: 9px;
+    font-size: 12px;
+    display: none;
+  }
 </style>
 {% endblock %}
 
@@ -373,15 +1271,21 @@ select.form-select-glass option {
 <!-- PAGE HEADER -->
 <div class="page-header animate-in">
   <div>
-    <h1 class="page-title"><i class="fas fa-cocktail" style="color:var(--bar-teal);margin-right:10px;"></i>Bar Stock Dashboard</h1>
+    <h1 class="page-title"><i class="fas fa-cocktail" style="color:var(--bar-teal);margin-right:10px;"></i>Bar Stock
+      Dashboard</h1>
     <p class="page-subtitle">Spirit inventory · cocktail recipes · weekly sales · analysis</p>
   </div>
   <div class="header-actions">
-    <button class="btn-glass" onclick="openModal('barSaleModal')" id="btnBarSale"><i class="fas fa-minus-circle" style="color:var(--bar-coral);"></i> Record Sale</button>
-    <button class="btn-glass" onclick="openModal('barWasteModal')" id="btnBarWaste"><i class="fas fa-exclamation-triangle" style="color:var(--bar-amber);"></i> Log Waste</button>
-    <button class="btn-glass" onclick="openModal('barPurchaseModal')" id="btnBarPurchase"><i class="fas fa-plus-circle" style="color:var(--bar-green);"></i> New Purchase</button>
-    <button class="btn-glass" onclick="openModal('addCocktailModal')" id="btnAddCocktail"><i class="fas fa-blender" style="color:var(--bar-purple);"></i> Add Recipe</button>
-    <button class="btn-bar-primary" onclick="openModal('addSpiritModal')" id="btnAddSpirit"><i class="fas fa-whiskey-glass"></i> Add Spirit</button>
+    <button class="btn-glass" onclick="openModal('barSaleModal')" id="btnBarSale"><i class="fas fa-minus-circle"
+        style="color:var(--bar-coral);"></i> Record Sale</button>
+    <button class="btn-glass" onclick="openModal('barWasteModal')" id="btnBarWaste"><i
+        class="fas fa-exclamation-triangle" style="color:var(--bar-amber);"></i> Log Waste</button>
+    <button class="btn-glass" onclick="openModal('barPurchaseModal')" id="btnBarPurchase"><i class="fas fa-plus-circle"
+        style="color:var(--bar-green);"></i> New Purchase</button>
+    <button class="btn-glass" onclick="openModal('addCocktailModal')" id="btnAddCocktail"><i class="fas fa-blender"
+        style="color:var(--bar-purple);"></i> Add Recipe</button>
+    <button class="btn-bar-primary" onclick="openModal('addSpiritModal')" id="btnAddSpirit"><i
+        class="fas fa-whiskey-glass"></i> Add Spirit</button>
   </div>
 </div>
 
@@ -389,26 +1293,34 @@ select.form-select-glass option {
 <section class="dashboard-section animate-in animate-delay-1" id="sectionBarWeekly">
   <div class="section-header-row">
     <div class="section-title-bar">
-      <span class="section-icon" style="background:var(--bar-blue-dim);color:var(--bar-blue);"><i class="fas fa-calendar-week"></i></span>
+      <span class="section-icon" style="background:var(--bar-blue-dim);color:var(--bar-blue);"><i
+          class="fas fa-calendar-week"></i></span>
       <h2 class="section-h2">Weekly Bar Sales</h2>
       <span class="section-badge badge-teal">{{ week_label }}</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <a href="?week_offset={{ week_offset - 1 }}" class="week-nav-btn" id="btnBarPrev"><i class="fas fa-chevron-left"></i> Prev</a>
-      <button class="btn-glass" onclick="downloadBarWeekPDF()" id="btnBarWeekPDF" style="padding:6px 12px;font-size:12px;"><i class="fas fa-file-pdf" style="color:var(--bar-coral);"></i> PDF</button>
-      <a href="?week_offset={{ week_offset + 1 }}" class="week-nav-btn" id="btnBarNext">Next <i class="fas fa-chevron-right"></i></a>
+      <a href="?week_offset={{ week_offset - 1 }}" class="week-nav-btn" id="btnBarPrev"><i
+          class="fas fa-chevron-left"></i> Prev</a>
+      <button class="btn-glass" onclick="downloadBarWeekPDF()" id="btnBarWeekPDF"
+        style="padding:6px 12px;font-size:12px;"><i class="fas fa-file-pdf" style="color:var(--bar-coral);"></i>
+        PDF</button>
+      <a href="?week_offset={{ week_offset + 1 }}" class="week-nav-btn" id="btnBarNext">Next <i
+          class="fas fa-chevron-right"></i></a>
     </div>
   </div>
   <div class="weekly-cards-scroll">
     <div class="weekly-cards-row" id="barWeeklyCardsRow">
       {% for day in weekly_data %}
-      <div class="weekly-day-card {% if day.is_today %}today{% endif %} {% if day.total_revenue > 0 %}has-data{% endif %}"
-           onclick="showBarDayDetail({{ loop.index0 }})" id="barDayCard{{ loop.index0 }}">
-        <div class="wdc-name">{% if day.is_today %}<span class="today-badge-mini">Today</span>{% endif %}{{ day.day_name[:3] }}</div>
+      <div
+        class="weekly-day-card {% if day.is_today %}today{% endif %} {% if day.total_revenue > 0 %}has-data{% endif %}"
+        onclick="showBarDayDetail({{ loop.index0 }})" id="barDayCard{{ loop.index0 }}">
+        <div class="wdc-name">{% if day.is_today %}<span class="today-badge-mini">Today</span>{% endif %}{{
+          day.day_name[:3] }}</div>
         <div class="wdc-date">{{ day.date_formatted }}</div>
         <div class="wdc-rev">€{{ '%.2f'|format(day.total_revenue) }}</div>
         <div class="wdc-units">{{ day.total_units }} sold</div>
-        {% if day.total_waste_cost > 0 %}<div class="wdc-waste">Waste: €{{ '%.2f'|format(day.total_waste_cost) }}</div>{% endif %}
+        {% if day.total_waste_cost > 0 %}<div class="wdc-waste">Waste: €{{ '%.2f'|format(day.total_waste_cost) }}</div>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -419,7 +1331,8 @@ select.form-select-glass option {
       <h3 id="barDayDetailTitle">—</h3>
       <div style="display:flex;gap:8px;align-items:center;">
         <span id="barDayDetailRevBadge" class="section-badge badge-teal"></span>
-        <button class="btn-tbl" onclick="document.getElementById('barDayDetailPanel').style.display='none'" id="closeBarDayDetail"><i class="fas fa-times"></i></button>
+        <button class="btn-tbl" onclick="document.getElementById('barDayDetailPanel').style.display='none'"
+          id="closeBarDayDetail"><i class="fas fa-times"></i></button>
       </div>
     </div>
     <div id="barDayDetailBody" style="margin-top:10px;"></div>
@@ -427,10 +1340,12 @@ select.form-select-glass option {
 </section>
 
 <!-- §2 ALERTS -->
-<section class="dashboard-section animate-in animate-delay-2" id="sectionBarAlerts" {% if not low_stock_spirits and not pending_purchases %}style="display:none;"{% endif %}>
+<section class="dashboard-section animate-in animate-delay-2" id="sectionBarAlerts" {% if not low_stock_spirits and not
+  pending_purchases %}style="display:none;" {% endif %}>
   <div class="section-header-row">
     <div class="section-title-bar">
-      <span class="section-icon" style="background:var(--bar-coral-dim);color:var(--bar-coral);"><i class="fas fa-bell"></i></span>
+      <span class="section-icon" style="background:var(--bar-coral-dim);color:var(--bar-coral);"><i
+          class="fas fa-bell"></i></span>
       <h2 class="section-h2">Alerts</h2>
     </div>
   </div>
@@ -439,8 +1354,10 @@ select.form-select-glass option {
   {% for s in low_stock_spirits %}
   <div class="alert-row" id="alertSpirit{{ s.id }}">
     <div><span class="cat-chip cat-{{ s.category }}">{{ s.category }}</span> <strong>{{ s.name }}</strong></div>
-    <div style="font-size:12px;color:var(--text-muted);">{{ '%.1f'|format(s.current_measures) }} measures left · min {{ s.minimum_stock_bottles }} bottles</div>
-    <button class="btn-glass" onclick="openModal('barPurchaseModal')" style="padding:5px 10px;font-size:11px;">Order</button>
+    <div style="font-size:12px;color:var(--text-muted);">{{ '%.1f'|format(s.current_measures) }} measures left · min {{
+      s.minimum_stock_bottles }} bottles</div>
+    <button class="btn-glass" onclick="openModal('barPurchaseModal')"
+      style="padding:5px 10px;font-size:11px;">Order</button>
   </div>
   {% endfor %}
   {% endif %}
@@ -449,8 +1366,10 @@ select.form-select-glass option {
   {% for p in pending_purchases %}
   <div class="alert-row" id="alertPurchase{{ p.id }}">
     <div><strong>{{ p.spirit_name }}</strong> · {{ p.bottles_ordered }} bottles</div>
-    <div style="font-size:12px;color:var(--text-muted);">Ordered {{ p.date_ordered }} · €{{ '%.2f'|format(p.total_cost) }}</div>
-    <button class="btn-glass" onclick="clearInvoice({{ p.id }})" style="padding:5px 10px;font-size:11px;" id="clearInvoiceBtn{{ p.id }}"><i class="fas fa-check"></i> Clear</button>
+    <div style="font-size:12px;color:var(--text-muted);">Ordered {{ p.date_ordered }} · €{{ '%.2f'|format(p.total_cost)
+      }}</div>
+    <button class="btn-glass" onclick="clearInvoice({{ p.id }})" style="padding:5px 10px;font-size:11px;"
+      id="clearInvoiceBtn{{ p.id }}"><i class="fas fa-check"></i> Clear</button>
   </div>
   {% endfor %}
   {% endif %}
@@ -460,22 +1379,28 @@ select.form-select-glass option {
 <section class="dashboard-section animate-in animate-delay-2" id="sectionBarVisual">
   <div class="section-header-row">
     <div class="section-title-bar">
-      <span class="section-icon" style="background:var(--bar-green-dim);color:var(--bar-green);"><i class="fas fa-chart-bar"></i></span>
+      <span class="section-icon" style="background:var(--bar-green-dim);color:var(--bar-green);"><i
+          class="fas fa-chart-bar"></i></span>
       <h2 class="section-h2">Visual Stock</h2>
       <span class="section-badge badge-green">{{ spirits|length }} spirits</span>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn-glass active" onclick="filterVisual('all',this)" id="filterAll" style="padding:5px 12px;font-size:12px;">All</button>
-      <button class="btn-glass" onclick="filterVisual('low',this)" id="filterLow" style="padding:5px 12px;font-size:12px;">Low</button>
-      <button class="btn-glass" onclick="filterVisual('ok',this)" id="filterOk" style="padding:5px 12px;font-size:12px;">OK</button>
-      <input type="text" class="form-control-glass" id="visualSearchInput" placeholder="Search spirit…" oninput="filterVisual('search',null,this.value)" style="width:150px;padding:5px 10px;font-size:12px;">
+      <button class="btn-glass active" onclick="filterVisual('all',this)" id="filterAll"
+        style="padding:5px 12px;font-size:12px;">All</button>
+      <button class="btn-glass" onclick="filterVisual('low',this)" id="filterLow"
+        style="padding:5px 12px;font-size:12px;">Low</button>
+      <button class="btn-glass" onclick="filterVisual('ok',this)" id="filterOk"
+        style="padding:5px 12px;font-size:12px;">OK</button>
+      <input type="text" class="form-control-glass" id="visualSearchInput" placeholder="Search spirit…"
+        oninput="filterVisual('search',null,this.value)" style="width:150px;padding:5px 10px;font-size:12px;">
     </div>
   </div>
   <div class="visual-stock-grid" id="visualStockGrid">
     {% for s in spirits %}
-    {% set pct = [[(s.current_measures / (s.minimum_stock_bottles * (s.bottle_size_ml / s.measure_ml)) * 100)|round(0)|int, 0]|max, 100]|min %}
-    <div class="bottle-card {% if pct <= 25 %}low{% elif pct >= 75 %}full{% endif %}"
-         id="visCard{{ s.id }}" data-cat="{{ s.category }}" data-name="{{ s.name|lower }}">
+    {% set pct = [[(s.current_measures / (s.minimum_stock_bottles * (s.bottle_size_ml / s.measure_ml)) *
+    100)|round(0)|int, 0]|max, 100]|min %}
+    <div class="bottle-card {% if pct <= 25 %}low{% elif pct >= 75 %}full{% endif %}" id="visCard{{ s.id }}"
+      data-cat="{{ s.category }}" data-name="{{ s.name|lower }}">
       <div class="bottle-fill-track">
         <div class="bottle-fill-bar {% if pct <= 25 %}low{% endif %}" style="height:{{ pct }}%;"></div>
       </div>
@@ -493,45 +1418,58 @@ select.form-select-glass option {
 <section class="dashboard-section animate-in animate-delay-3" id="sectionSpirits">
   <div class="section-header-row">
     <div class="section-title-bar">
-      <span class="section-icon" style="background:var(--bar-teal-dim);color:var(--bar-teal);"><i class="fas fa-whiskey-glass"></i></span>
+      <span class="section-icon" style="background:var(--bar-teal-dim);color:var(--bar-teal);"><i
+          class="fas fa-whiskey-glass"></i></span>
       <h2 class="section-h2">Spirits Database</h2>
       <span class="section-badge badge-teal">{{ spirits|length }} bottles</span>
     </div>
     <div class="table-search-wrapper">
       <i class="fas fa-search"></i>
-      <input type="text" id="spiritSearch" class="form-control-glass table-search-input" placeholder="Search spirits…" oninput="filterSpiritsTable(this.value)" style="width:200px;">
+      <input type="text" id="spiritSearch" class="form-control-glass table-search-input" placeholder="Search spirits…"
+        oninput="filterSpiritsTable(this.value)" style="width:200px;">
     </div>
   </div>
   <div style="overflow-x:auto;">
     <table class="data-table" id="spiritsTable">
-      <thead><tr>
-        <th>Spirit</th><th>Category</th><th>Supplier</th>
-        <th>Cost/Bottle</th><th>Measure</th><th>Cost/Measure</th>
-        <th>Shot Price</th><th>Margin</th><th>Stock</th><th>Actions</th>
-      </tr></thead>
+      <thead>
+        <tr>
+          <th>Spirit</th>
+          <th>Category</th>
+          <th>Supplier</th>
+          <th>Cost/Bottle</th>
+          <th>Measure</th>
+          <th>Cost/Measure</th>
+          <th>Shot Price</th>
+          <th>Margin</th>
+          <th>Stock</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
       <tbody id="spiritsTableBody">
-      {% for s in spirits %}
-      <tr id="spiritRow{{ s.id }}" data-name="{{ s.name|lower }}" data-cat="{{ s.category }}">
-        <td><strong>{{ s.name }}</strong></td>
-        <td><span class="cat-chip cat-{{ s.category }}">{{ s.category }}</span></td>
-        <td style="font-size:12px;color:var(--text-muted);">{{ s.supplier_name or '—' }}</td>
-        <td>€{{ '%.2f'|format(s.cost_price) }}</td>
-        <td>{{ s.measure_ml }}ml</td>
-        <td style="color:var(--bar-coral);">€{{ '%.4f'|format(s.cost_per_measure) }}</td>
-        <td style="color:var(--bar-teal);font-weight:600;">€{{ '%.2f'|format(s.shot_retail_price or 0) }}</td>
-        <td>{{ s.target_margin_percent }}%</td>
-        <td>
-          {% set bottles_left = (s.current_measures / (s.bottle_size_ml / s.measure_ml))|round(2) %}
-          <span class="{% if s.is_below_threshold %}text-coral{% else %}text-teal{% endif %}">
-            {{ '%.1f'|format(s.current_measures) }}m ({{ '%.2f'|format(bottles_left) }}b)
-          </span>
-        </td>
-        <td>
-          <button class="btn-tbl" onclick="editSpirit({{ s.id }})" id="editSpiritBtn{{ s.id }}"><i class="fas fa-pen"></i></button>
-          <button class="btn-tbl del" onclick="deleteSpirit({{ s.id }},'{{ s.name|e }}')" id="delSpiritBtn{{ s.id }}"><i class="fas fa-trash"></i></button>
-        </td>
-      </tr>
-      {% endfor %}
+        {% for s in spirits %}
+        <tr id="spiritRow{{ s.id }}" data-name="{{ s.name|lower }}" data-cat="{{ s.category }}">
+          <td><strong>{{ s.name }}</strong></td>
+          <td><span class="cat-chip cat-{{ s.category }}">{{ s.category }}</span></td>
+          <td style="font-size:12px;color:var(--text-muted);">{{ s.supplier_name or '—' }}</td>
+          <td>€{{ '%.2f'|format(s.cost_price) }}</td>
+          <td>{{ s.measure_ml }}ml</td>
+          <td style="color:var(--bar-coral);">€{{ '%.4f'|format(s.cost_per_measure) }}</td>
+          <td style="color:var(--bar-teal);font-weight:600;">€{{ '%.2f'|format(s.shot_retail_price or 0) }}</td>
+          <td>{{ s.target_margin_percent }}%</td>
+          <td>
+            {% set bottles_left = (s.current_measures / (s.bottle_size_ml / s.measure_ml))|round(2) %}
+            <span class="{% if s.is_below_threshold %}text-coral{% else %}text-teal{% endif %}">
+              {{ '%.1f'|format(s.current_measures) }}m ({{ '%.2f'|format(bottles_left) }}b)
+            </span>
+          </td>
+          <td>
+            <button class="btn-tbl" onclick="editSpirit({{ s.id }})" id="editSpiritBtn{{ s.id }}"><i
+                class="fas fa-pen"></i></button>
+            <button class="btn-tbl del" onclick="deleteSpirit({{ s.id }},'{{ s.name|e }}')"
+              id="delSpiritBtn{{ s.id }}"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
@@ -541,11 +1479,14 @@ select.form-select-glass option {
 <section class="dashboard-section animate-in animate-delay-3" id="sectionCocktails">
   <div class="section-header-row">
     <div class="section-title-bar">
-      <span class="section-icon" style="background:var(--bar-purple-dim);color:var(--bar-purple);"><i class="fas fa-blender"></i></span>
+      <span class="section-icon" style="background:var(--bar-purple-dim);color:var(--bar-purple);"><i
+          class="fas fa-blender"></i></span>
       <h2 class="section-h2">Cocktail Recipes</h2>
-      <span class="section-badge" style="background:var(--bar-purple-dim);color:var(--bar-purple);">{{ recipes|length }} recipes</span>
+      <span class="section-badge" style="background:var(--bar-purple-dim);color:var(--bar-purple);">{{ recipes|length }}
+        recipes</span>
     </div>
-    <button class="btn-glass" onclick="openModal('addCocktailModal')" id="btnAddRecipe2"><i class="fas fa-plus" style="color:var(--bar-purple);"></i> New Recipe</button>
+    <button class="btn-glass" onclick="openModal('addCocktailModal')" id="btnAddRecipe2"><i class="fas fa-plus"
+        style="color:var(--bar-purple);"></i> New Recipe</button>
   </div>
   <div class="recipe-cards-grid" id="recipeGrid">
     {% for r in recipes %}
@@ -566,9 +1507,13 @@ select.form-select-glass option {
         {% endfor %}
       </div>
       <div class="recipe-footer">
-        <button class="btn-tbl" onclick="sellCocktail({{ r.id }},{{ r.sell_price }},'{{ r.name|e }}')" id="sellCocktailBtn{{ r.id }}" style="color:var(--bar-teal);"><i class="fas fa-cash-register"></i> Sell</button>
-        <button class="btn-tbl" onclick="editCocktail({{ r.id }})" id="editCocktailBtn{{ r.id }}"><i class="fas fa-pen"></i></button>
-        <button class="btn-tbl del" onclick="deleteRecipe({{ r.id }},'{{ r.name|e }}')" id="delCocktailBtn{{ r.id }}"><i class="fas fa-trash"></i></button>
+        <button class="btn-tbl" onclick="sellCocktail({{ r.id }},{{ r.sell_price }},'{{ r.name|e }}')"
+          id="sellCocktailBtn{{ r.id }}" style="color:var(--bar-teal);"><i class="fas fa-cash-register"></i>
+          Sell</button>
+        <button class="btn-tbl" onclick="editCocktail({{ r.id }})" id="editCocktailBtn{{ r.id }}"><i
+            class="fas fa-pen"></i></button>
+        <button class="btn-tbl del" onclick="deleteRecipe({{ r.id }},'{{ r.name|e }}')" id="delCocktailBtn{{ r.id }}"><i
+            class="fas fa-trash"></i></button>
       </div>
     </div>
     {% endfor %}
@@ -579,13 +1524,16 @@ select.form-select-glass option {
 <section class="dashboard-section animate-in animate-delay-4" id="sectionSubIngs">
   <div class="section-header-row">
     <div class="section-title-bar">
-      <span class="section-icon" style="background:var(--bar-amber-dim);color:var(--bar-amber);"><i class="fas fa-lemon"></i></span>
+      <span class="section-icon" style="background:var(--bar-amber-dim);color:var(--bar-amber);"><i
+          class="fas fa-lemon"></i></span>
       <h2 class="section-h2">Mixers &amp; Sub-Ingredients</h2>
       <span class="section-badge badge-amber">{{ sub_ingredients|length }} registered</span>
     </div>
-    <button class="btn-glass" onclick="openModal('addSubIngModal')" id="btnAddSubIng"><i class="fas fa-plus" style="color:var(--bar-amber);"></i> Add Mixer</button>
+    <button class="btn-glass" onclick="openModal('addSubIngModal')" id="btnAddSubIng"><i class="fas fa-plus"
+        style="color:var(--bar-amber);"></i> Add Mixer</button>
   </div>
-  <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Reference registry — linked to cocktail recipes. Spirit stock is tracked separately; no price or stock for mixers.</p>
+  <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Reference registry — linked to cocktail recipes.
+    Spirit stock is tracked separately; no price or stock for mixers.</p>
   <div class="sub-ing-grid" id="subIngGrid">
     {% for sub in sub_ingredients %}
     <div class="sub-ing-card" id="subIngCard{{ sub.id }}">
@@ -594,13 +1542,16 @@ select.form-select-glass option {
         <div class="sub-ing-meta">{{ sub.category|capitalize }} · measured in {{ sub.unit }}</div>
       </div>
       <div style="display:flex;gap:4px;">
-        <button class="btn-tbl" onclick="editSubIng({{ sub.id }})" id="editSubIngBtn{{ sub.id }}"><i class="fas fa-pen"></i></button>
-        <button class="btn-tbl del" onclick="deleteSubIng({{ sub.id }},'{{ sub.name|e }}')" id="delSubIngBtn{{ sub.id }}"><i class="fas fa-trash"></i></button>
+        <button class="btn-tbl" onclick="editSubIng({{ sub.id }})" id="editSubIngBtn{{ sub.id }}"><i
+            class="fas fa-pen"></i></button>
+        <button class="btn-tbl del" onclick="deleteSubIng({{ sub.id }},'{{ sub.name|e }}')"
+          id="delSubIngBtn{{ sub.id }}"><i class="fas fa-trash"></i></button>
       </div>
     </div>
     {% endfor %}
     {% if not sub_ingredients %}
-    <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-lemon" style="font-size:28px;display:block;margin-bottom:8px;"></i>No mixers yet.</div>
+    <div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-lemon"
+        style="font-size:28px;display:block;margin-bottom:8px;"></i>No mixers yet.</div>
     {% endif %}
   </div>
 </section>
@@ -609,10 +1560,12 @@ select.form-select-glass option {
 <section class="dashboard-section animate-in animate-delay-5" id="sectionBarAnalysis">
   <div class="section-header-row">
     <div class="section-title-bar">
-      <span class="section-icon" style="background:var(--bar-amber-dim);color:var(--bar-amber);"><i class="fas fa-chart-line"></i></span>
+      <span class="section-icon" style="background:var(--bar-amber-dim);color:var(--bar-amber);"><i
+          class="fas fa-chart-line"></i></span>
       <h2 class="section-h2">Bar Analysis</h2>
     </div>
-    <button class="btn-glass" onclick="loadBarAnalysis()" id="btnRefreshAnalysis"><i class="fas fa-rotate" style="color:var(--bar-teal);"></i> Refresh</button>
+    <button class="btn-glass" onclick="loadBarAnalysis()" id="btnRefreshAnalysis"><i class="fas fa-rotate"
+        style="color:var(--bar-teal);"></i> Refresh</button>
   </div>
   <!-- Static KPIs from server -->
   <div class="analysis-kpi-row">
@@ -631,11 +1584,13 @@ select.form-select-glass option {
     </div>
     <div class="an-kpi-pill" style="border-top:2px solid var(--bar-amber);">
       <div class="an-kpi-pill-label">Top Cocktail</div>
-      <div class="an-kpi-pill-val" style="color:var(--bar-amber);font-size:14px;line-height:1.2;">{{ kpis.top_cocktail }}</div>
+      <div class="an-kpi-pill-val" style="color:var(--bar-amber);font-size:14px;line-height:1.2;">{{ kpis.top_cocktail
+        }}</div>
     </div>
     <div class="an-kpi-pill" style="border-top:2px solid var(--bar-blue);">
       <div class="an-kpi-pill-label">Top Spirit</div>
-      <div class="an-kpi-pill-val" style="color:var(--bar-blue);font-size:14px;line-height:1.2;">{{ kpis.top_spirit }}</div>
+      <div class="an-kpi-pill-val" style="color:var(--bar-blue);font-size:14px;line-height:1.2;">{{ kpis.top_spirit }}
+      </div>
     </div>
     <div class="an-kpi-pill" style="border-top:2px solid var(--bar-coral);">
       <div class="an-kpi-pill-label">Low Stock</div>
@@ -649,19 +1604,37 @@ select.form-select-glass option {
   </div>
   <!-- Live refresh KPIs -->
   <div class="an-kpi-grid" id="anKpiGrid" style="margin-top:6px;">
-    <div class="an-kpi-card"><div class="an-kpi-label" style="color:var(--bar-teal);">↻ Month Revenue</div><div class="an-kpi-val" id="anRevenue" style="color:var(--bar-teal);">—</div></div>
-    <div class="an-kpi-card"><div class="an-kpi-label" style="color:var(--bar-coral);">↻ Waste Cost</div><div class="an-kpi-val" id="anWaste" style="color:var(--bar-coral);">—</div></div>
-    <div class="an-kpi-card"><div class="an-kpi-label" style="color:var(--bar-amber);">↻ Purchase Cost</div><div class="an-kpi-val" id="anPurchases" style="color:var(--bar-amber);">—</div></div>
-    <div class="an-kpi-card"><div class="an-kpi-label" style="color:var(--bar-green);">↻ Net Profit Est.</div><div class="an-kpi-val" id="anProfit" style="color:var(--bar-green);">—</div></div>
+    <div class="an-kpi-card">
+      <div class="an-kpi-label" style="color:var(--bar-teal);">↻ Month Revenue</div>
+      <div class="an-kpi-val" id="anRevenue" style="color:var(--bar-teal);">—</div>
+    </div>
+    <div class="an-kpi-card">
+      <div class="an-kpi-label" style="color:var(--bar-coral);">↻ Waste Cost</div>
+      <div class="an-kpi-val" id="anWaste" style="color:var(--bar-coral);">—</div>
+    </div>
+    <div class="an-kpi-card">
+      <div class="an-kpi-label" style="color:var(--bar-amber);">↻ Purchase Cost</div>
+      <div class="an-kpi-val" id="anPurchases" style="color:var(--bar-amber);">—</div>
+    </div>
+    <div class="an-kpi-card">
+      <div class="an-kpi-label" style="color:var(--bar-green);">↻ Net Profit Est.</div>
+      <div class="an-kpi-val" id="anProfit" style="color:var(--bar-green);">—</div>
+    </div>
   </div>
   <div class="analysis-charts-grid" id="anChartsGrid" style="margin-top:16px;">
     <div class="analysis-section-card">
-      <div class="analysis-section-title"><i class="fas fa-cocktail" style="color:var(--bar-purple);"></i> Top Cocktails This Month</div>
-      <div id="cocktailAnalysisBars"><p style="color:var(--text-muted);font-size:13px;">Click Refresh to load…</p></div>
+      <div class="analysis-section-title"><i class="fas fa-cocktail" style="color:var(--bar-purple);"></i> Top Cocktails
+        This Month</div>
+      <div id="cocktailAnalysisBars">
+        <p style="color:var(--text-muted);font-size:13px;">Click Refresh to load…</p>
+      </div>
     </div>
     <div class="analysis-section-card">
-      <div class="analysis-section-title"><i class="fas fa-whiskey-glass" style="color:var(--bar-teal);"></i> Top Spirit Shots This Month</div>
-      <div id="spiritAnalysisBars"><p style="color:var(--text-muted);font-size:13px;">Click Refresh to load…</p></div>
+      <div class="analysis-section-title"><i class="fas fa-whiskey-glass" style="color:var(--bar-teal);"></i> Top Spirit
+        Shots This Month</div>
+      <div id="spiritAnalysisBars">
+        <p style="color:var(--text-muted);font-size:13px;">Click Refresh to load…</p>
+      </div>
     </div>
   </div>
 </section>
@@ -672,328 +1645,329 @@ select.form-select-glass option {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
-/* ── DATA INJECTED FROM SERVER ── */
-const BAR_SPIRITS       = {{ spirits | tojson }};
-const BAR_RECIPES       = {{ recipes | tojson }};
-const BAR_SUB_INGS      = {{ sub_ingredients | tojson }};
-const BAR_WEEKLY        = {{ weekly_data | tojson }};
-const BAR_WEEK_OFFSET   = {{ week_offset }};
-const BAR_TODAY         = '{{ today }}';
+  /* ── DATA INJECTED FROM SERVER ── */
+  const BAR_SPIRITS = {{ spirits | tojson }};
+  const BAR_RECIPES = {{ recipes | tojson }};
+  const BAR_SUB_INGS = {{ sub_ingredients | tojson }};
+  const BAR_WEEKLY = {{ weekly_data | tojson }};
+  const BAR_WEEK_OFFSET = {{ week_offset }};
+  const BAR_TODAY = '{{ today }}';
 
-/* ── MODAL HELPERS ── */
-function openModal(id){ document.getElementById(id)?.classList.add('active'); }
-function closeModal(id){ document.getElementById(id)?.classList.remove('active'); }
-document.addEventListener('click', e => { if(e.target.classList.contains('modal-overlay')) e.target.classList.remove('active'); });
+  /* ── MODAL HELPERS ── */
+  function openModal(id) { document.getElementById(id)?.classList.add('active'); }
+  function closeModal(id) { document.getElementById(id)?.classList.remove('active'); }
+  document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active'); });
 
-/* ── WEEKLY DAY DETAIL ── */
-function showBarDayDetail(idx){
-  const day = BAR_WEEKLY[idx];
-  if(!day) return;
-  const panel = document.getElementById('barDayDetailPanel');
-  document.getElementById('barDayDetailTitle').textContent = day.day_name + ' ' + day.date_formatted;
-  document.getElementById('barDayDetailRevBadge').textContent = '€' + day.total_revenue.toFixed(2);
-  const details = day.sale_details || {};
-  const keys = Object.keys(details);
-  const body = document.getElementById('barDayDetailBody');
-  if(!keys.length){
-    body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No sales recorded.</p>';
-  } else {
-    body.innerHTML = '<table class="data-table"><thead><tr><th>Item</th><th>Type</th><th>Qty</th><th>Revenue</th></tr></thead><tbody>' +
-      keys.map(k => `<tr><td>${k}</td><td>${details[k].type}</td><td>${details[k].qty}</td><td style="color:var(--bar-teal);">€${details[k].revenue.toFixed(2)}</td></tr>`).join('') +
-      '</tbody></table>';
+  /* ── WEEKLY DAY DETAIL ── */
+  function showBarDayDetail(idx) {
+    const day = BAR_WEEKLY[idx];
+    if (!day) return;
+    const panel = document.getElementById('barDayDetailPanel');
+    document.getElementById('barDayDetailTitle').textContent = day.day_name + ' ' + day.date_formatted;
+    document.getElementById('barDayDetailRevBadge').textContent = '€' + day.total_revenue.toFixed(2);
+    const details = day.sale_details || {};
+    const keys = Object.keys(details);
+    const body = document.getElementById('barDayDetailBody');
+    if (!keys.length) {
+      body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No sales recorded.</p>';
+    } else {
+      body.innerHTML = '<table class="data-table"><thead><tr><th>Item</th><th>Type</th><th>Qty</th><th>Revenue</th></tr></thead><tbody>' +
+        keys.map(k => `<tr><td>${k}</td><td>${details[k].type}</td><td>${details[k].qty}</td><td style="color:var(--bar-teal);">€${details[k].revenue.toFixed(2)}</td></tr>`).join('') +
+        '</tbody></table>';
+    }
+    panel.style.display = 'block';
   }
-  panel.style.display = 'block';
-}
 
-/* ── SPIRITS TABLE FILTER ── */
-function filterSpiritsTable(q){
-  q = q.toLowerCase();
-  document.querySelectorAll('#spiritsTableBody tr').forEach(r => {
-    r.style.display = (r.dataset.name||'').includes(q) || (r.dataset.cat||'').includes(q) ? '' : 'none';
-  });
-}
+  /* ── SPIRITS TABLE FILTER ── */
+  function filterSpiritsTable(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('#spiritsTableBody tr').forEach(r => {
+      r.style.display = (r.dataset.name || '').includes(q) || (r.dataset.cat || '').includes(q) ? '' : 'none';
+    });
+  }
 
-/* ── VISUAL STOCK FILTER ── */
-function filterVisual(mode, btn, q){
-  document.querySelectorAll('.weekly-cards-row .btn-glass').forEach(b=>b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  document.querySelectorAll('.bottle-card').forEach(c => {
-    if(mode==='all') c.style.display='';
-    else if(mode==='low') c.style.display = c.classList.contains('low') ? '' : 'none';
-    else if(mode==='ok')  c.style.display = !c.classList.contains('low') ? '' : 'none';
-    else if(mode==='search') c.style.display = (c.dataset.name||'').includes((q||'').toLowerCase()) ? '' : 'none';
-  });
-}
+  /* ── VISUAL STOCK FILTER ── */
+  function filterVisual(mode, btn, q) {
+    document.querySelectorAll('.weekly-cards-row .btn-glass').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    document.querySelectorAll('.bottle-card').forEach(c => {
+      if (mode === 'all') c.style.display = '';
+      else if (mode === 'low') c.style.display = c.classList.contains('low') ? '' : 'none';
+      else if (mode === 'ok') c.style.display = !c.classList.contains('low') ? '' : 'none';
+      else if (mode === 'search') c.style.display = (c.dataset.name || '').includes((q || '').toLowerCase()) ? '' : 'none';
+    });
+  }
 
-/* ── ADD / EDIT SPIRIT ── */
-function editSpirit(id){
-  const s = BAR_SPIRITS.find(x=>x.id===id);
-  if(!s) return;
-  document.getElementById('spiritModalTitle').textContent = 'Edit Spirit';
-  document.getElementById('spiritId').value = s.id;
-  document.getElementById('spiritName').value = s.name;
-  document.getElementById('spiritCategory').value = s.category;
-  document.getElementById('spiritSupplier').value = s.supplier_name || '';
-  document.getElementById('spiritCost').value = s.cost_price;
-  document.getElementById('spiritMeasureMl').value = s.measure_ml;
-  document.getElementById('spiritBottleSize').value = s.bottle_size_ml;
-  document.getElementById('spiritMargin').value = s.target_margin_percent;
-  document.getElementById('spiritShotPrice').value = s.shot_retail_price || '';
-  document.getElementById('spiritStock').value = s.current_measures;
-  document.getElementById('spiritMinStock').value = s.minimum_stock_bottles;
-  openModal('addSpiritModal');
-}
-async function saveSpirit(){
-  const id = document.getElementById('spiritId').value;
-  const payload = {
-    name:document.getElementById('spiritName').value, category:document.getElementById('spiritCategory').value,
-    supplier_name:document.getElementById('spiritSupplier').value, cost_price:parseFloat(document.getElementById('spiritCost').value)||0,
-    measure_ml:parseFloat(document.getElementById('spiritMeasureMl').value)||35.5,
-    bottle_size_ml:parseFloat(document.getElementById('spiritBottleSize').value)||700,
-    target_margin_percent:parseFloat(document.getElementById('spiritMargin').value)||70,
-    shot_retail_price:parseFloat(document.getElementById('spiritShotPrice').value)||null,
-    current_measures:parseFloat(document.getElementById('spiritStock').value)||0,
-    minimum_stock_bottles:parseFloat(document.getElementById('spiritMinStock').value)||1,
-  };
-  const url = id ? `/api/bar/spirits/${id}` : '/api/bar/spirits';
-  const method = id ? 'PUT' : 'POST';
-  const res = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(res.ok) location.reload(); else alert('Error saving spirit');
-}
-async function deleteSpirit(id,name){
-  if(!confirm(`Delete "${name}"?`)) return;
-  const res = await fetch(`/api/bar/spirits/${id}`,{method:'DELETE'});
-  if(res.ok) document.getElementById('spiritRow'+id)?.remove(); else alert('Error deleting spirit');
-}
+  /* ── ADD / EDIT SPIRIT ── */
+  function editSpirit(id) {
+    const s = BAR_SPIRITS.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('spiritModalTitle').textContent = 'Edit Spirit';
+    document.getElementById('spiritId').value = s.id;
+    document.getElementById('spiritName').value = s.name;
+    document.getElementById('spiritCategory').value = s.category;
+    document.getElementById('spiritSupplier').value = s.supplier_name || '';
+    document.getElementById('spiritCost').value = s.cost_price;
+    document.getElementById('spiritMeasureMl').value = s.measure_ml;
+    document.getElementById('spiritBottleSize').value = s.bottle_size_ml;
+    document.getElementById('spiritMargin').value = s.target_margin_percent;
+    document.getElementById('spiritShotPrice').value = s.shot_retail_price || '';
+    document.getElementById('spiritStock').value = s.current_measures;
+    document.getElementById('spiritMinStock').value = s.minimum_stock_bottles;
+    openModal('addSpiritModal');
+  }
+  async function saveSpirit() {
+    const id = document.getElementById('spiritId').value;
+    const payload = {
+      name: document.getElementById('spiritName').value, category: document.getElementById('spiritCategory').value,
+      supplier_name: document.getElementById('spiritSupplier').value, cost_price: parseFloat(document.getElementById('spiritCost').value) || 0,
+      measure_ml: parseFloat(document.getElementById('spiritMeasureMl').value) || 35.5,
+      bottle_size_ml: parseFloat(document.getElementById('spiritBottleSize').value) || 700,
+      target_margin_percent: parseFloat(document.getElementById('spiritMargin').value) || 70,
+      shot_retail_price: parseFloat(document.getElementById('spiritShotPrice').value) || null,
+      current_measures: parseFloat(document.getElementById('spiritStock').value) || 0,
+      minimum_stock_bottles: parseFloat(document.getElementById('spiritMinStock').value) || 1,
+    };
+    const url = id ? `/api/bar/spirits/${id}` : '/api/bar/spirits';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else alert('Error saving spirit');
+  }
+  async function deleteSpirit(id, name) {
+    if (!confirm(`Delete "${name}"?`)) return;
+    const res = await fetch(`/api/bar/spirits/${id}`, { method: 'DELETE' });
+    if (res.ok) document.getElementById('spiritRow' + id)?.remove(); else alert('Error deleting spirit');
+  }
 
-/* ── SELL COCKTAIL QUICK ── */
-function sellCocktail(id, price, name){
-  document.getElementById('saleModalTitle').textContent='Quick Sell: '+name;
-  document.getElementById('saleSpiritOrCocktail').value='cocktail';
-  changeSaleType('cocktail');
-  document.getElementById('saleCocktailId').value=id;
-  document.getElementById('salePrice').value=price.toFixed(2);
-  document.getElementById('saleDate').value=BAR_TODAY;
-  openModal('barSaleModal');
-}
+  /* ── SELL COCKTAIL QUICK ── */
+  function sellCocktail(id, price, name) {
+    document.getElementById('saleModalTitle').textContent = 'Quick Sell: ' + name;
+    document.getElementById('saleSpiritOrCocktail').value = 'cocktail';
+    changeSaleType('cocktail');
+    document.getElementById('saleCocktailId').value = id;
+    document.getElementById('salePrice').value = price.toFixed(2);
+    document.getElementById('saleDate').value = BAR_TODAY;
+    openModal('barSaleModal');
+  }
 
-/* ── SALE MODAL ── */
-function changeSaleType(type){
-  const isCocktail = type==='cocktail';
-  document.getElementById('spiritSaleRow').style.display=isCocktail?'none':'flex';
-  document.getElementById('cocktailSaleRow').style.display=isCocktail?'flex':'none';
-}
-async function saveSale(){
-  const type = document.getElementById('saleSpiritOrCocktail').value;
-  const payload = {
-    sale_type:type,
-    spirit_id: type==='shot'?(parseInt(document.getElementById('saleSpiritId').value)||null):null,
-    cocktail_id: type==='cocktail'?(parseInt(document.getElementById('saleCocktailId').value)||null):null,
-    quantity:parseInt(document.getElementById('saleQty').value)||1,
-    unit_price:parseFloat(document.getElementById('salePrice').value)||0,
-    date:document.getElementById('saleDate').value,
-  };
-  const res = await fetch('/api/bar/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(res.ok) location.reload(); else alert('Error recording sale');
-}
+  /* ── SALE MODAL ── */
+  function changeSaleType(type) {
+    const isCocktail = type === 'cocktail';
+    document.getElementById('spiritSaleRow').style.display = isCocktail ? 'none' : 'flex';
+    document.getElementById('cocktailSaleRow').style.display = isCocktail ? 'flex' : 'none';
+  }
+  async function saveSale() {
+    const type = document.getElementById('saleSpiritOrCocktail').value;
+    const payload = {
+      sale_type: type,
+      spirit_id: type === 'shot' ? (parseInt(document.getElementById('saleSpiritId').value) || null) : null,
+      cocktail_id: type === 'cocktail' ? (parseInt(document.getElementById('saleCocktailId').value) || null) : null,
+      quantity: parseInt(document.getElementById('saleQty').value) || 1,
+      unit_price: parseFloat(document.getElementById('salePrice').value) || 0,
+      date: document.getElementById('saleDate').value,
+    };
+    const res = await fetch('/api/bar/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else alert('Error recording sale');
+  }
 
-/* ── WASTE MODAL ── */
-async function saveWaste(){
-  const payload = {
-    waste_type:document.getElementById('wasteType').value,
-    spirit_id:parseInt(document.getElementById('wasteSpiritId').value)||null,
-    quantity:parseFloat(document.getElementById('wasteQty').value)||1,
-    reason:document.getElementById('wasteReason').value,
-    date:document.getElementById('wasteDate').value,
-  };
-  const res = await fetch('/api/bar/waste',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(res.ok) location.reload(); else alert('Error logging waste');
-}
+  /* ── WASTE MODAL ── */
+  async function saveWaste() {
+    const payload = {
+      waste_type: document.getElementById('wasteType').value,
+      spirit_id: parseInt(document.getElementById('wasteSpiritId').value) || null,
+      quantity: parseFloat(document.getElementById('wasteQty').value) || 1,
+      reason: document.getElementById('wasteReason').value,
+      date: document.getElementById('wasteDate').value,
+    };
+    const res = await fetch('/api/bar/waste', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else alert('Error logging waste');
+  }
 
-/* ── PURCHASE MODAL ── */
-async function savePurchase(){
-  const payload = {
-    spirit_id:parseInt(document.getElementById('purchaseSpiritId').value)||null,
-    bottles_ordered:parseFloat(document.getElementById('purchaseBottles').value)||0,
-    cost_per_bottle:parseFloat(document.getElementById('purchaseCostPerBottle').value)||0,
-    date_ordered:document.getElementById('purchaseDate').value,
-    supplier:document.getElementById('purchaseSupplier').value,
-  };
-  const res = await fetch('/api/bar/purchases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(res.ok) location.reload(); else alert('Error creating purchase');
-}
-async function clearInvoice(id){
-  const res = await fetch(`/api/bar/purchases/${id}/clear`,{method:'POST'});
-  if(res.ok) location.reload(); else alert('Error clearing invoice');
-}
+  /* ── PURCHASE MODAL ── */
+  async function savePurchase() {
+    const payload = {
+      spirit_id: parseInt(document.getElementById('purchaseSpiritId').value) || null,
+      bottles_ordered: parseFloat(document.getElementById('purchaseBottles').value) || 0,
+      cost_per_bottle: parseFloat(document.getElementById('purchaseCostPerBottle').value) || 0,
+      date_ordered: document.getElementById('purchaseDate').value,
+      supplier: document.getElementById('purchaseSupplier').value,
+    };
+    const res = await fetch('/api/bar/purchases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else alert('Error creating purchase');
+  }
+  async function clearInvoice(id) {
+    const res = await fetch(`/api/bar/purchases/${id}/clear`, { method: 'POST' });
+    if (res.ok) location.reload(); else alert('Error clearing invoice');
+  }
 
-/* ── ADD/EDIT SUB-INGREDIENT ── */
-function editSubIng(id){
-  const sub = BAR_SUB_INGS.find(x=>x.id===id);
-  if(!sub) return;
-  document.getElementById('subIngId').value=sub.id;
-  document.getElementById('subIngName').value=sub.name;
-  document.getElementById('subIngCategory').value=sub.category;
-  document.getElementById('subIngUnit').value=sub.unit;
-  openModal('addSubIngModal');
-}
-async function saveSubIng(){
-  const id = document.getElementById('subIngId').value;
-  const payload = {
-    name:document.getElementById('subIngName').value,
-    category:document.getElementById('subIngCategory').value,
-    unit:document.getElementById('subIngUnit').value,
-  };
-  const url = id?`/api/bar/sub-ingredients/${id}`:'/api/bar/sub-ingredients';
-  const method = id?'PUT':'POST';
-  const res = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(res.ok) location.reload(); else alert('Error saving mixer');
-}
-async function deleteSubIng(id,name){
-  if(!confirm(`Delete "${name}"?`)) return;
-  const res = await fetch(`/api/bar/sub-ingredients/${id}`,{method:'DELETE'});
-  if(res.ok) document.getElementById('subIngCard'+id)?.remove(); else alert('Error');
-}
+  /* ── ADD/EDIT SUB-INGREDIENT ── */
+  function editSubIng(id) {
+    const sub = BAR_SUB_INGS.find(x => x.id === id);
+    if (!sub) return;
+    document.getElementById('subIngId').value = sub.id;
+    document.getElementById('subIngName').value = sub.name;
+    document.getElementById('subIngCategory').value = sub.category;
+    document.getElementById('subIngUnit').value = sub.unit;
+    openModal('addSubIngModal');
+  }
+  async function saveSubIng() {
+    const id = document.getElementById('subIngId').value;
+    const payload = {
+      name: document.getElementById('subIngName').value,
+      category: document.getElementById('subIngCategory').value,
+      unit: document.getElementById('subIngUnit').value,
+    };
+    const url = id ? `/api/bar/sub-ingredients/${id}` : '/api/bar/sub-ingredients';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else alert('Error saving mixer');
+  }
+  async function deleteSubIng(id, name) {
+    if (!confirm(`Delete "${name}"?`)) return;
+    const res = await fetch(`/api/bar/sub-ingredients/${id}`, { method: 'DELETE' });
+    if (res.ok) document.getElementById('subIngCard' + id)?.remove(); else alert('Error');
+  }
 
-/* ── ADD/EDIT COCKTAIL ── */
-let ingRows=[];
-function editCocktail(id){
-  const r=BAR_RECIPES.find(x=>x.id===id); if(!r) return;
-  document.getElementById('cocktailModalTitle').textContent='Edit Recipe';
-  document.getElementById('cocktailId').value=r.id;
-  document.getElementById('cocktailName').value=r.name;
-  document.getElementById('cocktailDesc').value=r.description||'';
-  document.getElementById('cocktailSellPrice').value=r.sell_price;
-  ingRows = (r.ingredients||[]).map(i=>({type:i.spirit_id?'spirit':'sub', ref_id:i.spirit_id||i.sub_ingredient_id, qty:i.quantity}));
-  renderIngRows();
-  openModal('addCocktailModal');
-}
-function addIngRow(type){
-  ingRows.push({type,ref_id:null,qty:1});
-  renderIngRows();
-}
-function removeIngRow(idx){ ingRows.splice(idx,1); renderIngRows(); }
-function renderIngRows(){
-  const c=document.getElementById('ingBuilderRows');
-  if(!c) return;
-  c.innerHTML=ingRows.map((r,i)=>{
-    const opts = r.type==='spirit'
-      ? BAR_SPIRITS.map(s=>`<option value="${s.id}" ${s.id===r.ref_id?'selected':''}>${s.name}</option>`).join('')
-      : BAR_SUB_INGS.map(s=>`<option value="${s.id}" ${s.id===r.ref_id?'selected':''}>${s.name}</option>`).join('');
-    const label = r.type==='spirit'?'<span class="ing-type-lbl ing-lbl-spirit">Spirit</span>':'<span class="ing-type-lbl ing-lbl-mixer">Mixer</span>';
-    return `<div class="ing-row">${label}
+  /* ── ADD/EDIT COCKTAIL ── */
+  let ingRows = [];
+  function editCocktail(id) {
+    const r = BAR_RECIPES.find(x => x.id === id); if (!r) return;
+    document.getElementById('cocktailModalTitle').textContent = 'Edit Recipe';
+    document.getElementById('cocktailId').value = r.id;
+    document.getElementById('cocktailName').value = r.name;
+    document.getElementById('cocktailDesc').value = r.description || '';
+    document.getElementById('cocktailSellPrice').value = r.sell_price;
+    ingRows = (r.ingredients || []).map(i => ({ type: i.spirit_id ? 'spirit' : 'sub', ref_id: i.spirit_id || i.sub_ingredient_id, qty: i.quantity }));
+    renderIngRows();
+    openModal('addCocktailModal');
+  }
+  function addIngRow(type) {
+    ingRows.push({ type, ref_id: null, qty: 1 });
+    renderIngRows();
+  }
+  function removeIngRow(idx) { ingRows.splice(idx, 1); renderIngRows(); }
+  function renderIngRows() {
+    const c = document.getElementById('ingBuilderRows');
+    if (!c) return;
+    c.innerHTML = ingRows.map((r, i) => {
+      const opts = r.type === 'spirit'
+        ? BAR_SPIRITS.map(s => `<option value="${s.id}" ${s.id === r.ref_id ? 'selected' : ''}>${s.name}</option>`).join('')
+        : BAR_SUB_INGS.map(s => `<option value="${s.id}" ${s.id === r.ref_id ? 'selected' : ''}>${s.name}</option>`).join('');
+      const label = r.type === 'spirit' ? '<span class="ing-type-lbl ing-lbl-spirit">Spirit</span>' : '<span class="ing-type-lbl ing-lbl-mixer">Mixer</span>';
+      return `<div class="ing-row">${label}
       <select class="form-select-glass" onchange="ingRows[${i}].ref_id=parseInt(this.value)" style="flex:1;">${opts}</select>
       <input type="number" class="form-control-glass" value="${r.qty}" min="0.1" step="0.1" onchange="ingRows[${i}].qty=parseFloat(this.value)" style="width:70px;">
       <button class="ing-remove" onclick="removeIngRow(${i})">✕</button>
     </div>`;
-  }).join('');
-}
-async function saveCocktail(){
-  const id=document.getElementById('cocktailId').value;
-  const payload={
-    name:document.getElementById('cocktailName').value,
-    description:document.getElementById('cocktailDesc').value,
-    sell_price:parseFloat(document.getElementById('cocktailSellPrice').value)||0,
-    ingredients:ingRows.map(r=>({type:r.type,ref_id:r.ref_id,quantity:r.qty})),
-  };
-  const url=id?`/api/bar/cocktails/${id}`:'/api/bar/cocktails';
-  const method=id?'PUT':'POST';
-  const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(res.ok) location.reload(); else alert('Error saving recipe');
-}
-async function deleteRecipe(id,name){
-  if(!confirm(`Delete "${name}"?`)) return;
-  const res=await fetch(`/api/bar/cocktails/${id}`,{method:'DELETE'});
-  if(res.ok) location.reload(); else alert('Error');
-}
+    }).join('');
+  }
+  async function saveCocktail() {
+    const id = document.getElementById('cocktailId').value;
+    const payload = {
+      name: document.getElementById('cocktailName').value,
+      description: document.getElementById('cocktailDesc').value,
+      sell_price: parseFloat(document.getElementById('cocktailSellPrice').value) || 0,
+      ingredients: ingRows.map(r => ({ type: r.type, ref_id: r.ref_id, quantity: r.qty })),
+    };
+    const url = id ? `/api/bar/cocktails/${id}` : '/api/bar/cocktails';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else alert('Error saving recipe');
+  }
+  async function deleteRecipe(id, name) {
+    if (!confirm(`Delete "${name}"?`)) return;
+    const res = await fetch(`/api/bar/cocktails/${id}`, { method: 'DELETE' });
+    if (res.ok) location.reload(); else alert('Error');
+  }
 
-/* ── ANALYSIS ── */
-async function loadBarAnalysis(){
-  try{
-    const res=await fetch('/api/bar/analysis'); const d=await res.json();
-    document.getElementById('anRevenue').textContent='€'+d.total_revenue.toFixed(2);
-    document.getElementById('anWaste').textContent='€'+d.total_waste_cost.toFixed(2);
-    document.getElementById('anPurchases').textContent='€'+d.total_purchase_cost.toFixed(2);
-    const profit=d.total_revenue-d.total_waste_cost-d.total_purchase_cost;
-    const el=document.getElementById('anProfit');
-    if(el){el.textContent='€'+Math.max(0,profit).toFixed(2);el.style.color=profit<0?'var(--bar-coral)':'var(--bar-green)';}
-    renderBars('cocktailAnalysisBars',d.cocktail_breakdown);
-    renderBars('spiritAnalysisBars',d.spirit_breakdown);
-  }catch(e){console.error('Analysis failed',e);}
-}
-function renderBars(elId,list){
-  const el=document.getElementById(elId);
-  if(!list||!list.length){el.innerHTML='<p style="color:var(--text-muted);font-size:13px;">No data yet.</p>';return;}
-  const mx=Math.max(...list.map(([,v])=>v.revenue));
-  el.innerHTML=list.slice(0,8).map(([name,v])=>`
+  /* ── ANALYSIS ── */
+  async function loadBarAnalysis() {
+    try {
+      const res = await fetch('/api/bar/analysis'); const d = await res.json();
+      document.getElementById('anRevenue').textContent = '€' + d.total_revenue.toFixed(2);
+      document.getElementById('anWaste').textContent = '€' + d.total_waste_cost.toFixed(2);
+      document.getElementById('anPurchases').textContent = '€' + d.total_purchase_cost.toFixed(2);
+      const profit = d.total_revenue - d.total_waste_cost - d.total_purchase_cost;
+      const el = document.getElementById('anProfit');
+      if (el) { el.textContent = '€' + Math.max(0, profit).toFixed(2); el.style.color = profit < 0 ? 'var(--bar-coral)' : 'var(--bar-green)'; }
+      renderBars('cocktailAnalysisBars', d.cocktail_breakdown);
+      renderBars('spiritAnalysisBars', d.spirit_breakdown);
+    } catch (e) { console.error('Analysis failed', e); }
+  }
+  function renderBars(elId, list) {
+    const el = document.getElementById(elId);
+    if (!list || !list.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No data yet.</p>'; return; }
+    const mx = Math.max(...list.map(([, v]) => v.revenue));
+    el.innerHTML = list.slice(0, 8).map(([name, v]) => `
     <div class="analysis-bar-row">
       <div class="analysis-bar-label" title="${name}">${name}</div>
-      <div class="analysis-bar-track"><div class="analysis-bar-fill" style="width:${mx>0?v.revenue/mx*100:0}%"></div></div>
+      <div class="analysis-bar-track"><div class="analysis-bar-fill" style="width:${mx > 0 ? v.revenue / mx * 100 : 0}%"></div></div>
       <div class="analysis-bar-val">€${v.revenue.toFixed(0)}</div>
       <div style="font-size:11px;color:var(--text-muted);width:30px;text-align:right;">${v.qty}×</div>
     </div>`).join('');
-}
+  }
 
-/* ── PDF WEEKLY BAR SALES ── */
-function downloadBarWeekPDF(){
-  try{
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const weekLabel=document.querySelector('#sectionBarWeekly .section-badge')?.textContent||'Week';
-    const today=new Date().toLocaleDateString('en-IE',{day:'2-digit',month:'short',year:'numeric'});
-    doc.setFillColor(0,25,40);doc.rect(0,0,210,32,'F');
-    doc.setTextColor(0,212,170);doc.setFontSize(20);doc.setFont('helvetica','bold');
-    doc.text('Bar Weekly Sales Report',14,14);
-    doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(180,200,210);
-    doc.text('Period: '+weekLabel,14,22);doc.text('Generated: '+today,14,28);
-    doc.setTextColor(0,212,170);doc.text('Stock-Tech',196,22,{align:'right'});
-    const cards=document.querySelectorAll('.weekly-day-card');
-    let totalRev=0,totalUnits=0;const rows=[];
-    cards.forEach(card=>{
-      const name=(card.querySelector('.wdc-name')?.textContent||'').replace(/Today/i,'').trim();
-      const date=card.querySelector('.wdc-date')?.textContent.trim()||'';
-      const rev=card.querySelector('.wdc-rev')?.textContent.trim()||'€0.00';
-      const units=card.querySelector('.wdc-units')?.textContent.trim()||'0 sold';
-      const waste=card.querySelector('.wdc-waste')?.textContent.trim()||'—';
-      const revNum=parseFloat(rev.replace('€',''))||0;
-      totalRev+=revNum;totalUnits+=parseInt(units)||0;
-      rows.push({name,date,rev,units,waste,revNum});
-    });
-    doc.setFillColor(0,45,60);doc.roundedRect(14,36,182,16,3,3,'F');
-    doc.setTextColor(255,255,255);doc.setFontSize(10);doc.setFont('helvetica','bold');
-    doc.text('Total Revenue: €'+totalRev.toFixed(2),20,46);
-    doc.text('Total Sold: '+totalUnits+' items',100,46);
-    doc.setTextColor(0,212,170);doc.text('Avg/day: €'+(totalRev/7).toFixed(2),160,46);
-    doc.autoTable({startY:58,
-      head:[['Day','Date','Revenue','Items Sold','Waste']],
-      body:rows.map(r=>[r.name,r.date,r.rev,r.units,r.waste]),
-      theme:'grid',
-      styles:{fontSize:11,cellPadding:4,textColor:[220,230,240],fillColor:[10,20,30]},
-      headStyles:{fillColor:[0,60,80],textColor:[0,212,170],fontStyle:'bold'},
-      alternateRowStyles:{fillColor:[15,28,40]},
-      columnStyles:{2:{halign:'right',textColor:[0,212,170],fontStyle:'bold'},3:{halign:'center'},4:{halign:'right',textColor:[251,113,133]}},
-    });
-    const fy=doc.lastAutoTable?.finalY||140;
-    doc.setFillColor(0,212,170);doc.rect(14,fy+8,182,0.5,'F');
-    doc.setTextColor(120,140,160);doc.setFontSize(8);doc.setFont('helvetica','normal');
-    doc.text('Stock-Tech · Confidential · Bar Management System',105,fy+16,{align:'center'});
-    doc.save('Bar_Weekly_Sales_'+weekLabel.replace(/[^a-z0-9]/gi,'_')+'.pdf');
-  }catch(err){console.error('PDF error',err);alert('PDF generation failed.');}
-}
+  /* ── PDF WEEKLY BAR SALES ── */
+  function downloadBarWeekPDF() {
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const weekLabel = document.querySelector('#sectionBarWeekly .section-badge')?.textContent || 'Week';
+      const today = new Date().toLocaleDateString('en-IE', { day: '2-digit', month: 'short', year: 'numeric' });
+      doc.setFillColor(0, 25, 40); doc.rect(0, 0, 210, 32, 'F');
+      doc.setTextColor(0, 212, 170); doc.setFontSize(20); doc.setFont('helvetica', 'bold');
+      doc.text('Bar Weekly Sales Report', 14, 14);
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(180, 200, 210);
+      doc.text('Period: ' + weekLabel, 14, 22); doc.text('Generated: ' + today, 14, 28);
+      doc.setTextColor(0, 212, 170); doc.text('Stock-Tech', 196, 22, { align: 'right' });
+      const cards = document.querySelectorAll('.weekly-day-card');
+      let totalRev = 0, totalUnits = 0; const rows = [];
+      cards.forEach(card => {
+        const name = (card.querySelector('.wdc-name')?.textContent || '').replace(/Today/i, '').trim();
+        const date = card.querySelector('.wdc-date')?.textContent.trim() || '';
+        const rev = card.querySelector('.wdc-rev')?.textContent.trim() || '€0.00';
+        const units = card.querySelector('.wdc-units')?.textContent.trim() || '0 sold';
+        const waste = card.querySelector('.wdc-waste')?.textContent.trim() || '—';
+        const revNum = parseFloat(rev.replace('€', '')) || 0;
+        totalRev += revNum; totalUnits += parseInt(units) || 0;
+        rows.push({ name, date, rev, units, waste, revNum });
+      });
+      doc.setFillColor(0, 45, 60); doc.roundedRect(14, 36, 182, 16, 3, 3, 'F');
+      doc.setTextColor(255, 255, 255); doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+      doc.text('Total Revenue: €' + totalRev.toFixed(2), 20, 46);
+      doc.text('Total Sold: ' + totalUnits + ' items', 100, 46);
+      doc.setTextColor(0, 212, 170); doc.text('Avg/day: €' + (totalRev / 7).toFixed(2), 160, 46);
+      doc.autoTable({
+        startY: 58,
+        head: [['Day', 'Date', 'Revenue', 'Items Sold', 'Waste']],
+        body: rows.map(r => [r.name, r.date, r.rev, r.units, r.waste]),
+        theme: 'grid',
+        styles: { fontSize: 11, cellPadding: 4, textColor: [220, 230, 240], fillColor: [10, 20, 30] },
+        headStyles: { fillColor: [0, 60, 80], textColor: [0, 212, 170], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [15, 28, 40] },
+        columnStyles: { 2: { halign: 'right', textColor: [0, 212, 170], fontStyle: 'bold' }, 3: { halign: 'center' }, 4: { halign: 'right', textColor: [251, 113, 133] } },
+      });
+      const fy = doc.lastAutoTable?.finalY || 140;
+      doc.setFillColor(0, 212, 170); doc.rect(14, fy + 8, 182, 0.5, 'F');
+      doc.setTextColor(120, 140, 160); doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+      doc.text('Stock-Tech · Confidential · Bar Management System', 105, fy + 16, { align: 'center' });
+      doc.save('Bar_Weekly_Sales_' + weekLabel.replace(/[^a-z0-9]/gi, '_') + '.pdf');
+    } catch (err) { console.error('PDF error', err); alert('PDF generation failed.'); }
+  }
 
-document.addEventListener('DOMContentLoaded',()=>{
-  loadBarAnalysis();
-  // populate selects
-  const spiritOpts=BAR_SPIRITS.map(s=>`<option value="${s.id}">${s.name} (${s.category})</option>`).join('');
-  const cocktailOpts=BAR_RECIPES.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
-  ['saleSpiritId','wasteSpiritId','purchaseSpiritId'].forEach(id=>{
-    const el=document.getElementById(id);if(el) el.innerHTML='<option value="">Select spirit…</option>'+spiritOpts;
+  document.addEventListener('DOMContentLoaded', () => {
+    loadBarAnalysis();
+    // populate selects
+    const spiritOpts = BAR_SPIRITS.map(s => `<option value="${s.id}">${s.name} (${s.category})</option>`).join('');
+    const cocktailOpts = BAR_RECIPES.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    ['saleSpiritId', 'wasteSpiritId', 'purchaseSpiritId'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.innerHTML = '<option value="">Select spirit…</option>' + spiritOpts;
+    });
+    const cSel = document.getElementById('saleCocktailId'); if (cSel) cSel.innerHTML = '<option value="">Select cocktail…</option>' + cocktailOpts;
+    const sdate = document.getElementById('saleDate'); if (sdate) sdate.value = BAR_TODAY;
+    const wdate = document.getElementById('wasteDate'); if (wdate) wdate.value = BAR_TODAY;
+    const pdate = document.getElementById('purchaseDate'); if (pdate) pdate.value = BAR_TODAY;
   });
-  const cSel=document.getElementById('saleCocktailId');if(cSel) cSel.innerHTML='<option value="">Select cocktail…</option>'+cocktailOpts;
-  const sdate=document.getElementById('saleDate');if(sdate) sdate.value=BAR_TODAY;
-  const wdate=document.getElementById('wasteDate');if(wdate) wdate.value=BAR_TODAY;
-  const pdate=document.getElementById('purchaseDate');if(pdate) pdate.value=BAR_TODAY;
-});
 </script>
 
 <!-- ═══════════════════════════════════════════════
@@ -1004,37 +1978,54 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="modal-overlay modal-glass" id="addSpiritModal">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title" id="spiritModalTitle">Add Spirit</h5><button class="btn-tbl" onclick="closeModal('addSpiritModal');document.getElementById('spiritId').value=''">✕</button></div>
+      <div class="modal-header">
+        <h5 class="modal-title" id="spiritModalTitle">Add Spirit</h5><button class="btn-tbl"
+          onclick="closeModal('addSpiritModal');document.getElementById('spiritId').value=''">✕</button>
+      </div>
       <div class="modal-body">
         <input type="hidden" id="spiritId">
         <div class="form-row">
-          <div><label class="form-label-sm">Name</label><input class="form-control-glass" id="spiritName" placeholder="e.g. Jameson"></div>
+          <div><label class="form-label-sm">Name</label><input class="form-control-glass" id="spiritName"
+              placeholder="e.g. Jameson"></div>
           <div><label class="form-label-sm">Category</label>
             <select class="form-select-glass" id="spiritCategory">
-              <option value="whiskey">Whiskey</option><option value="vodka">Vodka</option><option value="gin">Gin</option>
-              <option value="rum">Rum</option><option value="tequila">Tequila</option><option value="brandy">Brandy</option>
-              <option value="liqueur">Liqueur</option><option value="other">Other</option>
+              <option value="whiskey">Whiskey</option>
+              <option value="vodka">Vodka</option>
+              <option value="gin">Gin</option>
+              <option value="rum">Rum</option>
+              <option value="tequila">Tequila</option>
+              <option value="brandy">Brandy</option>
+              <option value="liqueur">Liqueur</option>
+              <option value="other">Other</option>
             </select>
           </div>
         </div>
         <div class="form-row" style="margin-top:10px;">
           <div><label class="form-label-sm">Supplier</label>
             <select class="form-select-glass" id="spiritSupplier">
-              <option value="Connalty">Connalty</option><option value="Celtic Whiskey">Celtic Whiskey</option>
+              <option value="Connalty">Connalty</option>
+              <option value="Celtic Whiskey">Celtic Whiskey</option>
             </select>
           </div>
-          <div><label class="form-label-sm">Cost / Bottle (€)</label><input class="form-control-glass" id="spiritCost" type="number" step="0.01" placeholder="0.00"></div>
+          <div><label class="form-label-sm">Cost / Bottle (€)</label><input class="form-control-glass" id="spiritCost"
+              type="number" step="0.01" placeholder="0.00"></div>
         </div>
         <div class="form-row-3" style="margin-top:10px;">
-          <div><label class="form-label-sm">Bottle Size (ml)</label><input class="form-control-glass" id="spiritBottleSize" type="number" value="700"></div>
-          <div><label class="form-label-sm">Measure (ml)</label><input class="form-control-glass" id="spiritMeasureMl" type="number" value="35.5"></div>
-          <div><label class="form-label-sm">Margin %</label><input class="form-control-glass" id="spiritMargin" type="number" value="70"></div>
+          <div><label class="form-label-sm">Bottle Size (ml)</label><input class="form-control-glass"
+              id="spiritBottleSize" type="number" value="700"></div>
+          <div><label class="form-label-sm">Measure (ml)</label><input class="form-control-glass" id="spiritMeasureMl"
+              type="number" value="35.5"></div>
+          <div><label class="form-label-sm">Margin %</label><input class="form-control-glass" id="spiritMargin"
+              type="number" value="70"></div>
         </div>
         <div class="form-row" style="margin-top:10px;">
-          <div><label class="form-label-sm">Shot Retail Price (€)</label><input class="form-control-glass" id="spiritShotPrice" type="number" step="0.01"></div>
-          <div><label class="form-label-sm">Current Stock (measures)</label><input class="form-control-glass" id="spiritStock" type="number" step="0.1"></div>
+          <div><label class="form-label-sm">Shot Retail Price (€)</label><input class="form-control-glass"
+              id="spiritShotPrice" type="number" step="0.01"></div>
+          <div><label class="form-label-sm">Current Stock (measures)</label><input class="form-control-glass"
+              id="spiritStock" type="number" step="0.1"></div>
         </div>
-        <div style="margin-top:10px;"><label class="form-label-sm">Min Stock (bottles)</label><input class="form-control-glass" id="spiritMinStock" type="number" step="0.5" value="1"></div>
+        <div style="margin-top:10px;"><label class="form-label-sm">Min Stock (bottles)</label><input
+            class="form-control-glass" id="spiritMinStock" type="number" step="0.5" value="1"></div>
       </div>
       <div class="modal-footer">
         <button class="btn-modal-cancel" onclick="closeModal('addSpiritModal')">Cancel</button>
@@ -1048,20 +2039,29 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="modal-overlay modal-glass" id="barSaleModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title" id="saleModalTitle">Record Sale</h5><button class="btn-tbl" onclick="closeModal('barSaleModal')">✕</button></div>
+      <div class="modal-header">
+        <h5 class="modal-title" id="saleModalTitle">Record Sale</h5><button class="btn-tbl"
+          onclick="closeModal('barSaleModal')">✕</button>
+      </div>
       <div class="modal-body">
         <div style="margin-bottom:10px;"><label class="form-label-sm">Type</label>
           <select class="form-select-glass" id="saleSpiritOrCocktail" onchange="changeSaleType(this.value)">
-            <option value="shot">Shot / Spirit</option><option value="cocktail">Cocktail</option>
+            <option value="shot">Shot / Spirit</option>
+            <option value="cocktail">Cocktail</option>
           </select>
         </div>
-        <div id="spiritSaleRow" style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select class="form-select-glass" id="saleSpiritId"></select></div>
-        <div id="cocktailSaleRow" style="margin-bottom:10px;display:none;"><label class="form-label-sm">Cocktail</label><select class="form-select-glass" id="saleCocktailId"></select></div>
+        <div id="spiritSaleRow" style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select
+            class="form-select-glass" id="saleSpiritId"></select></div>
+        <div id="cocktailSaleRow" style="margin-bottom:10px;display:none;"><label
+            class="form-label-sm">Cocktail</label><select class="form-select-glass" id="saleCocktailId"></select></div>
         <div class="form-row" style="margin-top:10px;">
-          <div><label class="form-label-sm">Qty</label><input class="form-control-glass" id="saleQty" type="number" value="1" min="1"></div>
-          <div><label class="form-label-sm">Unit Price (€)</label><input class="form-control-glass" id="salePrice" type="number" step="0.01"></div>
+          <div><label class="form-label-sm">Qty</label><input class="form-control-glass" id="saleQty" type="number"
+              value="1" min="1"></div>
+          <div><label class="form-label-sm">Unit Price (€)</label><input class="form-control-glass" id="salePrice"
+              type="number" step="0.01"></div>
         </div>
-        <div style="margin-top:10px;"><label class="form-label-sm">Date</label><input class="form-control-glass" id="saleDate" type="date"></div>
+        <div style="margin-top:10px;"><label class="form-label-sm">Date</label><input class="form-control-glass"
+            id="saleDate" type="date"></div>
       </div>
       <div class="modal-footer">
         <button class="btn-modal-cancel" onclick="closeModal('barSaleModal')">Cancel</button>
@@ -1075,15 +2075,22 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="modal-overlay modal-glass" id="barWasteModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Log Waste / Spillage</h5><button class="btn-tbl" onclick="closeModal('barWasteModal')">✕</button></div>
+      <div class="modal-header">
+        <h5 class="modal-title">Log Waste / Spillage</h5><button class="btn-tbl"
+          onclick="closeModal('barWasteModal')">✕</button>
+      </div>
       <div class="modal-body">
-        <div style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select class="form-select-glass" id="wasteSpiritId"></select></div>
+        <div style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select class="form-select-glass"
+            id="wasteSpiritId"></select></div>
         <input type="hidden" id="wasteType" value="spirit">
         <div class="form-row" style="margin-top:10px;">
-          <div><label class="form-label-sm">Qty (measures)</label><input class="form-control-glass" id="wasteQty" type="number" min="0.1" step="0.1" value="1"></div>
-          <div><label class="form-label-sm">Date</label><input class="form-control-glass" id="wasteDate" type="date"></div>
+          <div><label class="form-label-sm">Qty (measures)</label><input class="form-control-glass" id="wasteQty"
+              type="number" min="0.1" step="0.1" value="1"></div>
+          <div><label class="form-label-sm">Date</label><input class="form-control-glass" id="wasteDate" type="date">
+          </div>
         </div>
-        <div style="margin-top:10px;"><label class="form-label-sm">Reason</label><input class="form-control-glass" id="wasteReason" placeholder="e.g. Spillage, breakage…"></div>
+        <div style="margin-top:10px;"><label class="form-label-sm">Reason</label><input class="form-control-glass"
+            id="wasteReason" placeholder="e.g. Spillage, breakage…"></div>
       </div>
       <div class="modal-footer">
         <button class="btn-modal-cancel" onclick="closeModal('barWasteModal')">Cancel</button>
@@ -1097,20 +2104,28 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="modal-overlay modal-glass" id="barPurchaseModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">New Purchase Order</h5><button class="btn-tbl" onclick="closeModal('barPurchaseModal')">✕</button></div>
+      <div class="modal-header">
+        <h5 class="modal-title">New Purchase Order</h5><button class="btn-tbl"
+          onclick="closeModal('barPurchaseModal')">✕</button>
+      </div>
       <div class="modal-body">
-        <div style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select class="form-select-glass" id="purchaseSpiritId"></select></div>
+        <div style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select class="form-select-glass"
+            id="purchaseSpiritId"></select></div>
         <div class="form-row" style="margin-top:10px;">
           <div><label class="form-label-sm">Supplier</label>
             <select class="form-select-glass" id="purchaseSupplier">
-              <option value="Connalty">Connalty</option><option value="Celtic Whiskey">Celtic Whiskey</option>
+              <option value="Connalty">Connalty</option>
+              <option value="Celtic Whiskey">Celtic Whiskey</option>
             </select>
           </div>
-          <div><label class="form-label-sm">Date</label><input class="form-control-glass" id="purchaseDate" type="date"></div>
+          <div><label class="form-label-sm">Date</label><input class="form-control-glass" id="purchaseDate" type="date">
+          </div>
         </div>
         <div class="form-row" style="margin-top:10px;">
-          <div><label class="form-label-sm">Bottles Ordered</label><input class="form-control-glass" id="purchaseBottles" type="number" min="1" value="1"></div>
-          <div><label class="form-label-sm">Cost / Bottle (€)</label><input class="form-control-glass" id="purchaseCostPerBottle" type="number" step="0.01"></div>
+          <div><label class="form-label-sm">Bottles Ordered</label><input class="form-control-glass"
+              id="purchaseBottles" type="number" min="1" value="1"></div>
+          <div><label class="form-label-sm">Cost / Bottle (€)</label><input class="form-control-glass"
+              id="purchaseCostPerBottle" type="number" step="0.01"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1125,20 +2140,28 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="modal-overlay modal-glass" id="addCocktailModal">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title" id="cocktailModalTitle">Add Recipe</h5><button class="btn-tbl" onclick="closeModal('addCocktailModal');document.getElementById('cocktailId').value=''">✕</button></div>
+      <div class="modal-header">
+        <h5 class="modal-title" id="cocktailModalTitle">Add Recipe</h5><button class="btn-tbl"
+          onclick="closeModal('addCocktailModal');document.getElementById('cocktailId').value=''">✕</button>
+      </div>
       <div class="modal-body">
         <input type="hidden" id="cocktailId">
         <div class="form-row">
-          <div><label class="form-label-sm">Name</label><input class="form-control-glass" id="cocktailName" placeholder="e.g. Espresso Martini"></div>
-          <div><label class="form-label-sm">Sell Price (€)</label><input class="form-control-glass" id="cocktailSellPrice" type="number" step="0.01"></div>
+          <div><label class="form-label-sm">Name</label><input class="form-control-glass" id="cocktailName"
+              placeholder="e.g. Espresso Martini"></div>
+          <div><label class="form-label-sm">Sell Price (€)</label><input class="form-control-glass"
+              id="cocktailSellPrice" type="number" step="0.01"></div>
         </div>
-        <div style="margin-top:10px;"><label class="form-label-sm">Description</label><input class="form-control-glass" id="cocktailDesc" placeholder="Short description…"></div>
+        <div style="margin-top:10px;"><label class="form-label-sm">Description</label><input class="form-control-glass"
+            id="cocktailDesc" placeholder="Short description…"></div>
         <div style="margin-top:14px;">
           <label class="form-label-sm">Ingredients</label>
           <div class="ing-builder-rows" id="ingBuilderRows"></div>
           <div style="display:flex;gap:8px;margin-top:8px;">
-            <button class="btn-glass" onclick="addIngRow('spirit')" style="font-size:12px;padding:6px 12px;"><i class="fas fa-whiskey-glass" style="color:var(--bar-teal);"></i> Add Spirit</button>
-            <button class="btn-glass" onclick="addIngRow('sub')" style="font-size:12px;padding:6px 12px;"><i class="fas fa-lemon" style="color:var(--bar-amber);"></i> Add Mixer</button>
+            <button class="btn-glass" onclick="addIngRow('spirit')" style="font-size:12px;padding:6px 12px;"><i
+                class="fas fa-whiskey-glass" style="color:var(--bar-teal);"></i> Add Spirit</button>
+            <button class="btn-glass" onclick="addIngRow('sub')" style="font-size:12px;padding:6px 12px;"><i
+                class="fas fa-lemon" style="color:var(--bar-amber);"></i> Add Mixer</button>
           </div>
         </div>
       </div>
@@ -1154,18 +2177,28 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div class="modal-overlay modal-glass" id="addSubIngModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Add Mixer / Sub-Ingredient</h5><button class="btn-tbl" onclick="closeModal('addSubIngModal');document.getElementById('subIngId').value=''">✕</button></div>
+      <div class="modal-header">
+        <h5 class="modal-title">Add Mixer / Sub-Ingredient</h5><button class="btn-tbl"
+          onclick="closeModal('addSubIngModal');document.getElementById('subIngId').value=''">✕</button>
+      </div>
       <div class="modal-body">
         <input type="hidden" id="subIngId">
-        <div style="margin-bottom:10px;"><label class="form-label-sm">Name</label><input class="form-control-glass" id="subIngName" placeholder="e.g. Simple Syrup"></div>
+        <div style="margin-bottom:10px;"><label class="form-label-sm">Name</label><input class="form-control-glass"
+            id="subIngName" placeholder="e.g. Simple Syrup"></div>
         <div class="form-row" style="margin-top:10px;">
           <div><label class="form-label-sm">Category</label>
             <select class="form-select-glass" id="subIngCategory">
-              <option value="syrup">Syrup</option><option value="juice">Juice</option><option value="mixer">Mixer</option>
-              <option value="fruit">Fruit/Puree</option><option value="garnish">Garnish</option><option value="dairy">Dairy</option><option value="other">Other</option>
+              <option value="syrup">Syrup</option>
+              <option value="juice">Juice</option>
+              <option value="mixer">Mixer</option>
+              <option value="fruit">Fruit/Puree</option>
+              <option value="garnish">Garnish</option>
+              <option value="dairy">Dairy</option>
+              <option value="other">Other</option>
             </select>
           </div>
-          <div><label class="form-label-sm">Unit</label><input class="form-control-glass" id="subIngUnit" placeholder="ml, dash, pieces…"></div>
+          <div><label class="form-label-sm">Unit</label><input class="form-control-glass" id="subIngUnit"
+              placeholder="ml, dash, pieces…"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1177,4 +2210,3 @@ document.addEventListener('DOMContentLoaded',()=>{
 </div>
 
 {% endblock %}
-
