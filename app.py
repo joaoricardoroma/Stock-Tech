@@ -28,7 +28,9 @@ from flask_login import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from models import db, User, Supplier, Wine, WineSale, WinePurchase
+from models import (db, User, Supplier, Wine, WineSale, WinePurchase, WineComp,
+                     Spirit, SpiritSale, SpiritPurchase, SubIngredient,
+                     CocktailRecipe, CocktailIngredient, BarSale, BarWaste)
 
 # ---------------------------------------------------------------------------
 # App Factory
@@ -141,30 +143,58 @@ def wine_stock():
         WinePurchase.date_ordered <= sunday
     ).all()
 
+    # Weekly comps for the selected week
+    weekly_comps = WineComp.query.filter(
+        WineComp.date >= monday,
+        WineComp.date <= sunday
+    ).all()
+
     # Build day-by-day data
     day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     weekly_data = []
+    weekly_comps_data = []
+
     for i in range(7):
         day_date = monday + timedelta(days=i)
         day_sales = [s for s in weekly_sales if s.date == day_date]
         day_purchases = [p for p in weekly_purchases if p.date_ordered == day_date]
+        day_comps = [c for c in weekly_comps if c.date == day_date]
 
         total_sold = sum(s.quantity_sold for s in day_sales)
         total_ordered = sum(p.quantity_ordered for p in day_purchases)
+        total_comps = sum(c.quantity for c in day_comps)
 
-        # Wine-level detail for clicked day
+        # Wine-level detail for clicked day (sales)
         wine_details = {}
         for s in day_sales:
             wname = s.wine.name if s.wine else 'Unknown'
             if wname not in wine_details:
-                wine_details[wname] = {'sold': 0, 'ordered': 0, 'wine_id': s.wine_id}
+                wine_details[wname] = {'sold': 0, 'ordered': 0, 'wine_id': s.wine_id,
+                                        'glasses_sold': 0, 'bottles_sold': 0}
             wine_details[wname]['sold'] += s.quantity_sold
+            if s.sale_type == 'glass':
+                wine_details[wname]['glasses_sold'] += s.quantity_sold
+            else:
+                wine_details[wname]['bottles_sold'] += s.quantity_sold
 
         for p in day_purchases:
             wname = p.wine.name if p.wine else 'Unknown'
             if wname not in wine_details:
-                wine_details[wname] = {'sold': 0, 'ordered': 0, 'wine_id': p.wine_id}
+                wine_details[wname] = {'sold': 0, 'ordered': 0, 'wine_id': p.wine_id,
+                                        'glasses_sold': 0, 'bottles_sold': 0}
             wine_details[wname]['ordered'] += p.quantity_ordered
+
+        # Wine-level comp details
+        comp_details = {}
+        for c in day_comps:
+            wname = c.wine.name if c.wine else 'Unknown'
+            if wname not in comp_details:
+                comp_details[wname] = {'total': 0, 'glasses': 0, 'bottles': 0, 'wine_id': c.wine_id}
+            comp_details[wname]['total'] += c.quantity
+            if c.sale_type == 'glass':
+                comp_details[wname]['glasses'] += c.quantity
+            else:
+                comp_details[wname]['bottles'] += c.quantity
 
         weekly_data.append({
             'day_name': day_names[i],
@@ -175,6 +205,16 @@ def wine_stock():
             'is_today': day_date == today,
             'is_past': day_date < today,
             'wine_details': wine_details,
+        })
+
+        weekly_comps_data.append({
+            'day_name': day_names[i],
+            'date': day_date.isoformat(),
+            'date_formatted': day_date.strftime('%d %b'),
+            'total_comps': total_comps,
+            'is_today': day_date == today,
+            'is_past': day_date < today,
+            'comp_details': comp_details,
         })
 
     # --- Pending Purchases (not yet cleared) ---
@@ -199,8 +239,16 @@ def wine_stock():
     for sale in month_sales:
         wine = sale.wine
         if wine:
-            revenue = (wine.retail_price or 0) * sale.quantity_sold
-            cost = wine.cost_price * sale.quantity_sold
+            # Revenue: bottle price always; glass = bottle_price / glasses_per_bottle
+            if sale.sale_type == 'glass':
+                unit_price = (wine.retail_price or 0) / wine.glasses_per_bottle
+                unit_cost = wine.cost_price / wine.glasses_per_bottle
+            else:
+                unit_price = wine.retail_price or 0
+                unit_cost = wine.cost_price
+
+            revenue = unit_price * sale.quantity_sold
+            cost = unit_cost * sale.quantity_sold
             total_revenue += revenue
             total_cost_of_sold += cost
 
@@ -260,11 +308,15 @@ def wine_stock():
     for w in wines_data:
         w['invoice_count'] = invoice_counts.get(w['id'], 0)
 
+    # Weekly comps total for badge
+    week_comps_total = sum(d['total_comps'] for d in weekly_comps_data)
 
     return render_template('wine_stock.html',
                            wines=wines_data,
                            suppliers=suppliers,
                            weekly_data=weekly_data,
+                           weekly_comps_data=weekly_comps_data,
+                           week_comps_total=week_comps_total,
                            pending_purchases=pending_purchases,
                            low_stock_wines=low_stock_wines,
                            kpis=kpis,
@@ -280,27 +332,85 @@ def wine_stock():
 @app.route('/api/wine/sale', methods=['POST'])
 @login_required
 def record_sale():
-    """Record a wine sale."""
+    """Record a wine sale (glass or bottle)."""
     data = request.get_json()
     wine_id = data.get('wine_id')
     quantity = data.get('quantity', 1)
     sale_date = data.get('date', date.today().isoformat())
+    sale_type = data.get('sale_type', 'bottle')  # 'glass' or 'bottle'
 
     wine = Wine.query.get_or_404(wine_id)
 
-    if wine.current_stock_qty < quantity:
+    # Calculate stock deduction
+    if sale_type == 'glass':
+        gpb = wine.glasses_per_bottle if wine.glasses_per_bottle else 1
+        deduction = quantity / gpb
+    else:
+        deduction = quantity
+
+    if wine.current_stock_qty < deduction:
         return jsonify({'error': 'Insufficient stock'}), 400
 
     sale = WineSale(
         wine_id=wine_id,
         quantity_sold=quantity,
+        sale_type=sale_type,
         date=datetime.strptime(sale_date, '%Y-%m-%d').date()
     )
-    wine.current_stock_qty -= quantity
+    wine.current_stock_qty = round(wine.current_stock_qty - deduction, 4)
     db.session.add(sale)
     db.session.commit()
 
-    return jsonify({'success': True, 'new_stock': wine.current_stock_qty, 'sale': sale.to_dict()})
+    return jsonify({
+        'success': True,
+        'new_stock': wine.current_stock_qty,
+        'stock_display': wine.stock_display,
+        'sale': sale.to_dict()
+    })
+
+
+@app.route('/api/wine/comp', methods=['POST'])
+@login_required
+def record_comp():
+    """
+    Record a complimentary (free) drink.
+    DEDUCTS from stock — comps consume real inventory,
+    they are just not counted as revenue.
+    """
+    data = request.get_json()
+    wine_id = data.get('wine_id')
+    quantity = data.get('quantity', 1)
+    sale_type = data.get('sale_type', 'glass')  # 'glass' or 'bottle'
+    comp_date = data.get('date', date.today().isoformat())
+
+    wine = Wine.query.get_or_404(wine_id)
+
+    # Calculate stock deduction (same logic as a sale)
+    if sale_type == 'glass':
+        gpb = wine.glasses_per_bottle if wine.glasses_per_bottle else 1
+        deduction = quantity / gpb
+    else:
+        deduction = quantity
+
+    if wine.current_stock_qty < deduction:
+        return jsonify({'error': 'Insufficient stock for this comp'}), 400
+
+    comp = WineComp(
+        wine_id=wine_id,
+        quantity=quantity,
+        sale_type=sale_type,
+        date=datetime.strptime(comp_date, '%Y-%m-%d').date()
+    )
+    wine.current_stock_qty = round(wine.current_stock_qty - deduction, 4)
+    db.session.add(comp)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'new_stock': wine.current_stock_qty,
+        'stock_display': wine.stock_display,
+        'comp': comp.to_dict()
+    })
 
 
 @app.route('/api/wine/purchase', methods=['POST'])
@@ -383,15 +493,16 @@ def clear_invoice(purchase_id):
     purchase.is_invoice_cleared = True
     purchase.date_cleared = datetime.utcnow()
 
-    # NOW add to stock
+    # NOW add to stock (whole bottles purchased)
     wine = Wine.query.get(purchase.wine_id)
-    wine.current_stock_qty += purchase.quantity_ordered
+    wine.current_stock_qty = round(wine.current_stock_qty + purchase.quantity_ordered, 4)
 
     db.session.commit()
 
     return jsonify({
         'success': True,
         'new_stock': wine.current_stock_qty,
+        'stock_display': wine.stock_display,
         'purchase': purchase.to_dict()
     })
 
@@ -428,42 +539,62 @@ def monthly_report_data():
     today = date.today()
     first_of_month = today.replace(day=1)
 
-    # All sales and purchases this month
+    # All sales, purchases, and comps this month
     month_sales = WineSale.query.filter(WineSale.date >= first_of_month).all()
     month_purchases = WinePurchase.query.filter(WinePurchase.date_ordered >= first_of_month).all()
+    month_comps = WineComp.query.filter(WineComp.date >= first_of_month).all()
     wines = Wine.query.order_by(Wine.name).all()
 
     # Build week-by-week data for this month
-    # Find all Mon–Sun weeks that overlap the month
     weeks = []
-    # Start from the Monday of the week containing first_of_month
     wk_start = first_of_month - timedelta(days=first_of_month.weekday())
     while wk_start <= today:
         wk_end = wk_start + timedelta(days=6)
         wk_sales = [s for s in month_sales if wk_start <= s.date <= wk_end]
         wk_purchases = [p for p in month_purchases if wk_start <= p.date_ordered <= wk_end]
+        wk_comps = [c for c in month_comps if wk_start <= c.date <= wk_end]
 
         days = []
         for i in range(7):
             d = wk_start + timedelta(days=i)
             d_sales = [s for s in wk_sales if s.date == d]
             d_purchases = [p for p in wk_purchases if p.date_ordered == d]
+            d_comps = [c for c in wk_comps if c.date == d]
+
             wine_details = {}
             for s in d_sales:
                 wn = s.wine.name if s.wine else 'Unknown'
-                wine_details.setdefault(wn, {'sold': 0, 'ordered': 0})
+                wine_details.setdefault(wn, {'sold': 0, 'ordered': 0, 'glasses_sold': 0, 'bottles_sold': 0})
                 wine_details[wn]['sold'] += s.quantity_sold
+                if s.sale_type == 'glass':
+                    wine_details[wn]['glasses_sold'] += s.quantity_sold
+                else:
+                    wine_details[wn]['bottles_sold'] += s.quantity_sold
+
             for p in d_purchases:
                 wn = p.wine.name if p.wine else 'Unknown'
-                wine_details.setdefault(wn, {'sold': 0, 'ordered': 0})
+                wine_details.setdefault(wn, {'sold': 0, 'ordered': 0, 'glasses_sold': 0, 'bottles_sold': 0})
                 wine_details[wn]['ordered'] += p.quantity_ordered
+
+            comp_details = {}
+            for c in d_comps:
+                wn = c.wine.name if c.wine else 'Unknown'
+                comp_details.setdefault(wn, {'total': 0, 'glasses': 0, 'bottles': 0})
+                comp_details[wn]['total'] += c.quantity
+                if c.sale_type == 'glass':
+                    comp_details[wn]['glasses'] += c.quantity
+                else:
+                    comp_details[wn]['bottles'] += c.quantity
+
             days.append({
                 'date': d.isoformat(),
                 'day_name': d.strftime('%A'),
                 'date_formatted': d.strftime('%d %b'),
                 'total_sold': sum(s.quantity_sold for s in d_sales),
                 'total_ordered': sum(p.quantity_ordered for p in d_purchases),
+                'total_comps': sum(c.quantity for c in d_comps),
                 'wine_details': wine_details,
+                'comp_details': comp_details,
             })
 
         weeks.append({
@@ -473,24 +604,38 @@ def monthly_report_data():
             'days': days,
             'total_sold': sum(d['total_sold'] for d in days),
             'total_ordered': sum(d['total_ordered'] for d in days),
+            'total_comps': sum(d['total_comps'] for d in days),
         })
         wk_start += timedelta(weeks=1)
 
     # Per-wine monthly summary
     wine_summary = []
     for wine in wines:
-        sold = sum(s.quantity_sold for s in month_sales if s.wine_id == wine.id)
+        sold_qty = sum(s.quantity_sold for s in month_sales if s.wine_id == wine.id)
+        comps_qty = sum(c.quantity for c in month_comps if c.wine_id == wine.id)
         ordered = sum(p.quantity_ordered for p in month_purchases if p.wine_id == wine.id)
-        revenue = (wine.retail_price or 0) * sold
-        cost = wine.cost_price * sold
-        if sold > 0 or ordered > 0:
+
+        # Revenue: per-sale pricing (glass vs bottle)
+        revenue = 0
+        cost = 0
+        for s in [s for s in month_sales if s.wine_id == wine.id]:
+            if s.sale_type == 'glass':
+                gpb = wine.glasses_per_bottle if wine.glasses_per_bottle else 1
+                revenue += ((wine.retail_price or 0) / gpb) * s.quantity_sold
+                cost += (wine.cost_price / gpb) * s.quantity_sold
+            else:
+                revenue += (wine.retail_price or 0) * s.quantity_sold
+                cost += wine.cost_price * s.quantity_sold
+
+        if sold_qty > 0 or ordered > 0 or comps_qty > 0:
             wine_summary.append({
                 'name': wine.name,
-                'sold': sold,
+                'sold': sold_qty,
+                'comps': comps_qty,
                 'ordered': ordered,
                 'revenue': round(revenue, 2),
                 'profit': round(revenue - cost, 2),
-                'current_stock': wine.current_stock_qty,
+                'current_stock': wine.stock_display,
             })
 
     return jsonify({
@@ -501,9 +646,12 @@ def monthly_report_data():
         'kpis': {
             'total_sold': sum(s.quantity_sold for s in month_sales),
             'total_ordered': sum(p.quantity_ordered for p in month_purchases),
+            'total_comps': sum(c.quantity for c in month_comps),
             'total_revenue': round(sum(
-                (w.retail_price or 0) * sum(s.quantity_sold for s in month_sales if s.wine_id == w.id)
+                ((w.retail_price or 0) / (w.glasses_per_bottle if s.sale_type == 'glass' and w.glasses_per_bottle else 1)
+                 if s.sale_type == 'glass' else (w.retail_price or 0)) * s.quantity_sold
                 for w in wines
+                for s in month_sales if s.wine_id == w.id
             ), 2),
         }
     })
@@ -530,7 +678,7 @@ def update_wine(wine_id):
     wine.glasses_per_bottle = int(data.get('glasses_per_bottle', wine.glasses_per_bottle))
     wine.target_margin_percent = float(data.get('target_margin_percent', wine.target_margin_percent))
     wine.minimum_stock_threshold = int(data.get('minimum_stock_threshold', wine.minimum_stock_threshold))
-    wine.current_stock_qty = int(data.get('current_stock_qty', wine.current_stock_qty))
+    wine.current_stock_qty = float(data.get('current_stock_qty', wine.current_stock_qty))
 
     wine.calculate_prices()
     db.session.commit()
@@ -551,7 +699,7 @@ def add_wine():
         glasses_per_bottle=int(data.get('glasses_per_bottle', 5)),
         target_margin_percent=float(data.get('target_margin_percent', 70)),
         minimum_stock_threshold=int(data.get('minimum_stock_threshold', 3)),
-        current_stock_qty=int(data.get('current_stock_qty', 0)),
+        current_stock_qty=float(data.get('current_stock_qty', 0)),
     )
     wine.calculate_prices()
     db.session.add(wine)
@@ -596,6 +744,517 @@ def weekly_sales_api():
     ).all()
 
     return jsonify([s.to_dict() for s in sales])
+
+
+# ---------------------------------------------------------------------------
+# BAR Routes
+# ---------------------------------------------------------------------------
+
+@app.route('/bar')
+@login_required
+def bar_stock():
+    """Main Bar management page."""
+    try:
+        week_offset = int(request.args.get('week_offset', 0))
+    except (ValueError, TypeError):
+        week_offset = 0
+
+    spirits = Spirit.query.order_by(Spirit.category, Spirit.name).all()
+    sub_ingredients = SubIngredient.query.order_by(SubIngredient.category, SubIngredient.name).all()
+    recipes = CocktailRecipe.query.order_by(CocktailRecipe.name).all()
+
+    today = date.today()
+    monday = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+    sunday = monday + timedelta(days=6)
+    week_label = f"{monday.strftime('%d %b')} – {sunday.strftime('%d %b %Y')}"
+
+    weekly_bar_sales = BarSale.query.filter(
+        BarSale.date >= monday, BarSale.date <= sunday
+    ).all()
+    weekly_purchases = SpiritPurchase.query.filter(
+        SpiritPurchase.date_ordered >= monday, SpiritPurchase.date_ordered <= sunday
+    ).all()
+    weekly_waste = BarWaste.query.filter(
+        BarWaste.date >= monday, BarWaste.date <= sunday
+    ).all()
+
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    weekly_data = []
+    for i in range(7):
+        day_date = monday + timedelta(days=i)
+        day_sales = [s for s in weekly_bar_sales if s.date == day_date]
+        day_waste = [w for w in weekly_waste if w.date == day_date]
+
+        total_revenue = sum((s.unit_price or 0) * s.quantity for s in day_sales)
+        total_waste_cost = sum(w.cost_impact or 0 for w in day_waste)
+
+        sale_details = {}
+        for s in day_sales:
+            key = s.cocktail.name if s.sale_type == 'cocktail' and s.cocktail else (s.spirit.name if s.spirit else 'Unknown')
+            if key not in sale_details:
+                sale_details[key] = {'qty': 0, 'revenue': 0, 'type': s.sale_type}
+            sale_details[key]['qty'] += s.quantity
+            sale_details[key]['revenue'] += round((s.unit_price or 0) * s.quantity, 2)
+
+        weekly_data.append({
+            'day_name': day_names[i],
+            'date': day_date.isoformat(),
+            'date_formatted': day_date.strftime('%d %b'),
+            'total_revenue': round(total_revenue, 2),
+            'total_units': sum(s.quantity for s in day_sales),
+            'total_waste_cost': round(total_waste_cost, 2),
+            'sale_details': sale_details,
+            'is_today': day_date == today,
+            'is_past': day_date < today,
+        })
+
+    # Monthly KPIs
+    first_of_month = today.replace(day=1)
+    month_bar_sales = BarSale.query.filter(BarSale.date >= first_of_month).all()
+    month_waste = BarWaste.query.filter(BarWaste.date >= first_of_month).all()
+    month_purchases = SpiritPurchase.query.filter(
+        SpiritPurchase.date_ordered >= first_of_month,
+        SpiritPurchase.is_invoice_cleared == True
+    ).all()
+
+    total_revenue = sum((s.unit_price or 0) * s.quantity for s in month_bar_sales)
+    total_waste_cost = sum(w.cost_impact or 0 for w in month_waste)
+    total_purchase_cost = sum(
+        (p.cost_per_bottle or 0) * p.bottles_ordered for p in month_purchases
+    )
+
+    # Top cocktail & spirit
+    cocktail_counts = {}
+    shot_counts = {}
+    for s in month_bar_sales:
+        if s.sale_type == 'cocktail' and s.cocktail:
+            cocktail_counts[s.cocktail.name] = cocktail_counts.get(s.cocktail.name, 0) + s.quantity
+        elif s.sale_type == 'shot' and s.spirit:
+            shot_counts[s.spirit.name] = shot_counts.get(s.spirit.name, 0) + s.quantity
+
+    top_cocktail = max(cocktail_counts, key=cocktail_counts.get) if cocktail_counts else 'N/A'
+    top_spirit = max(shot_counts, key=shot_counts.get) if shot_counts else 'N/A'
+
+    total_stock_value = sum(s.stock_value for s in spirits) + sum(i.stock_value for i in sub_ingredients)
+    low_stock_spirits = [s for s in spirits if s.is_below_threshold]
+    pending_purchases = SpiritPurchase.query.filter_by(is_invoice_cleared=False).all()
+
+    spirits_data = [s.to_dict() for s in spirits]
+    recipes_data = [r.to_dict() for r in recipes]
+    sub_ingredients_data = [i.to_dict() for i in sub_ingredients]
+
+    kpis = {
+        'total_revenue': round(total_revenue, 2),
+        'total_waste_cost': round(total_waste_cost, 2),
+        'total_purchase_cost': round(total_purchase_cost, 2),
+        'total_stock_value': round(total_stock_value, 2),
+        'low_stock_count': len(low_stock_spirits),
+        'total_spirits': len(spirits),
+        'total_recipes': len(recipes),
+        'top_cocktail': top_cocktail,
+        'top_spirit': top_spirit,
+    }
+
+    return render_template('bar_stock.html',
+                           spirits=spirits_data,
+                           sub_ingredients=sub_ingredients_data,
+                           recipes=recipes_data,
+                           weekly_data=weekly_data,
+                           pending_purchases=[p.to_dict() for p in pending_purchases],
+                           low_stock_spirits=[s.to_dict() for s in low_stock_spirits],
+                           kpis=kpis,
+                           today=today.isoformat(),
+                           week_offset=week_offset,
+                           week_label=week_label)
+
+
+# --- Spirit CRUD ---
+
+@app.route('/api/bar/spirit', methods=['POST'])
+@login_required
+def add_spirit():
+    data = request.get_json()
+    spirit = Spirit(
+        name=data['name'],
+        brand=data.get('brand'),
+        category=data.get('category', 'vodka'),
+        bottle_size_ml=float(data.get('bottle_size_ml', 700)),
+        measure_ml=float(data.get('measure_ml', 25)),
+        cost_price=float(data.get('cost_price', 0)),
+        target_margin_percent=float(data.get('target_margin_percent', 70)),
+        minimum_stock_bottles=int(data.get('minimum_stock_bottles', 1)),
+        current_measures=float(data.get('current_measures', 0)),
+        supplier_name=data.get('supplier_name'),
+        notes=data.get('notes'),
+    )
+    # Manual override or auto-calculate
+    if data.get('shot_retail_price'):
+        spirit.shot_retail_price = float(data['shot_retail_price'])
+        spirit.cocktail_price_per_measure = float(data.get('cocktail_price_per_measure', spirit.shot_retail_price))
+    else:
+        spirit.calculate_shot_price()
+    db.session.add(spirit)
+    db.session.commit()
+    return jsonify({'success': True, 'spirit': spirit.to_dict()}), 201
+
+
+@app.route('/api/bar/spirit/<int:spirit_id>', methods=['GET'])
+@login_required
+def get_spirit(spirit_id):
+    spirit = Spirit.query.get_or_404(spirit_id)
+    return jsonify(spirit.to_dict())
+
+
+@app.route('/api/bar/spirit/<int:spirit_id>', methods=['PUT'])
+@login_required
+def update_spirit(spirit_id):
+    spirit = Spirit.query.get_or_404(spirit_id)
+    data = request.get_json()
+    spirit.name = data.get('name', spirit.name)
+    spirit.brand = data.get('brand', spirit.brand)
+    spirit.category = data.get('category', spirit.category)
+    spirit.bottle_size_ml = float(data.get('bottle_size_ml', spirit.bottle_size_ml))
+    spirit.measure_ml = float(data.get('measure_ml', spirit.measure_ml))
+    spirit.cost_price = float(data.get('cost_price', spirit.cost_price))
+    spirit.target_margin_percent = float(data.get('target_margin_percent', spirit.target_margin_percent))
+    spirit.minimum_stock_bottles = int(data.get('minimum_stock_bottles', spirit.minimum_stock_bottles))
+    spirit.current_measures = float(data.get('current_measures', spirit.current_measures))
+    spirit.supplier_name = data.get('supplier_name', spirit.supplier_name)
+    spirit.notes = data.get('notes', spirit.notes)
+    if data.get('shot_retail_price') is not None:
+        spirit.shot_retail_price = float(data['shot_retail_price'])
+    else:
+        spirit.calculate_shot_price()
+    if data.get('cocktail_price_per_measure') is not None:
+        spirit.cocktail_price_per_measure = float(data['cocktail_price_per_measure'])
+    db.session.commit()
+    return jsonify({'success': True, 'spirit': spirit.to_dict()})
+
+
+@app.route('/api/bar/spirit/<int:spirit_id>', methods=['DELETE'])
+@login_required
+def delete_spirit(spirit_id):
+    spirit = Spirit.query.get_or_404(spirit_id)
+    db.session.delete(spirit)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# --- Spirit Purchase ---
+
+@app.route('/api/bar/spirit/purchase', methods=['POST'])
+@login_required
+def bar_record_purchase():
+    data = request.get_json()
+    spirit = Spirit.query.get_or_404(data['spirit_id'])
+    purchase = SpiritPurchase(
+        spirit_id=spirit.id,
+        bottles_ordered=int(data.get('bottles_ordered', 1)),
+        cost_per_bottle=float(data['cost_per_bottle']) if data.get('cost_per_bottle') else spirit.cost_price,
+        date_ordered=datetime.strptime(data.get('date', date.today().isoformat()), '%Y-%m-%d').date(),
+        notes=data.get('notes'),
+    )
+    db.session.add(purchase)
+    db.session.commit()
+    return jsonify({'success': True, 'purchase': purchase.to_dict()})
+
+
+@app.route('/api/bar/spirit/clear-invoice/<int:purchase_id>', methods=['POST'])
+@login_required
+def bar_clear_invoice(purchase_id):
+    purchase = SpiritPurchase.query.get_or_404(purchase_id)
+    if purchase.is_invoice_cleared:
+        return jsonify({'error': 'Invoice already cleared'}), 400
+    if 'invoice_image' not in request.files:
+        return jsonify({'error': 'Invoice image is required.'}), 400
+    file = request.files['invoice_image']
+    if file.filename == '' or not allowed_file(file.filename):
+        return jsonify({'error': 'Please upload a valid image or PDF.'}), 400
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
+    if is_image:
+        unique_name = f"bar_invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.jpg"
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        try:
+            img = Image.open(file.stream)
+            if img.mode not in ('RGB', 'L'):
+                img = img.convert('RGB')
+            if img.width > 1200:
+                ratio = 1200 / img.width
+                img = img.resize((1200, int(img.height * ratio)), Image.LANCZOS)
+            img.save(save_path, format='JPEG', quality=75, optimize=True)
+        except Exception:
+            file.seek(0); file.save(save_path)
+    else:
+        unique_name = f"bar_invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.{ext}"
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
+        file.save(save_path)
+    purchase.invoice_image_path = f"uploads/invoices/{unique_name}"
+    purchase.invoice_image_original = secure_filename(file.filename)
+    purchase.is_invoice_cleared = True
+    purchase.date_cleared = datetime.utcnow()
+    # Add measures to spirit
+    spirit = Spirit.query.get(purchase.spirit_id)
+    spirit.current_measures = round(spirit.current_measures + purchase.bottles_ordered * spirit.measures_per_bottle, 4)
+    db.session.commit()
+    return jsonify({'success': True, 'spirit': spirit.to_dict(), 'purchase': purchase.to_dict()})
+
+
+# --- Bar Sale (cocktail or shot) ---
+
+@app.route('/api/bar/sale', methods=['POST'])
+@login_required
+def bar_record_sale():
+    """Record a bar sale. Deducts measures from spirit stock."""
+    data = request.get_json()
+    sale_type = data.get('sale_type', 'cocktail')
+    quantity = int(data.get('quantity', 1))
+    sale_date = datetime.strptime(data.get('date', date.today().isoformat()), '%Y-%m-%d').date()
+
+    if sale_type == 'cocktail':
+        recipe = CocktailRecipe.query.get_or_404(data['cocktail_id'])
+        unit_price = float(data.get('unit_price', recipe.sell_price))
+        # Check & deduct stock for each ingredient
+        for ing in recipe.ingredients:
+            if ing.spirit_id and ing.spirit:
+                needed = ing.quantity * quantity
+                if ing.spirit.current_measures < needed:
+                    return jsonify({'error': f'Insufficient measures of {ing.spirit.name}'}), 400
+        for ing in recipe.ingredients:
+            if ing.spirit_id and ing.spirit:
+                ing.spirit.current_measures = round(ing.spirit.current_measures - ing.quantity * quantity, 4)
+            elif ing.sub_ingredient_id and ing.sub_ingredient:
+                ing.sub_ingredient.current_stock = round(
+                    max(0, ing.sub_ingredient.current_stock - ing.quantity * quantity), 4)
+        sale = BarSale(date=sale_date, sale_type='cocktail', cocktail_id=recipe.id,
+                       quantity=quantity, unit_price=unit_price)
+    else:  # shot
+        spirit = Spirit.query.get_or_404(data['spirit_id'])
+        measures = float(data.get('measures', 1))
+        unit_price = float(data.get('unit_price', spirit.shot_retail_price or 0))
+        needed = measures * quantity
+        if spirit.current_measures < needed:
+            return jsonify({'error': f'Insufficient measures of {spirit.name}'}), 400
+        spirit.current_measures = round(spirit.current_measures - needed, 4)
+        sale = BarSale(date=sale_date, sale_type='shot', spirit_id=spirit.id,
+                       quantity=quantity, unit_price=unit_price)
+
+    db.session.add(sale)
+    db.session.commit()
+    return jsonify({'success': True, 'sale': sale.to_dict()})
+
+
+# --- Sub-Ingredient CRUD ---
+
+@app.route('/api/bar/sub-ingredient', methods=['POST'])
+@login_required
+def add_sub_ingredient():
+    data = request.get_json()
+    item = SubIngredient(
+        name=data['name'],
+        category=data.get('category', 'mixer'),
+        unit=data.get('unit', 'ml'),
+        cost_per_unit=float(data.get('cost_per_unit', 0)),
+        current_stock=float(data.get('current_stock', 0)),
+        minimum_stock=float(data.get('minimum_stock', 0)),
+        notes=data.get('notes'),
+    )
+    db.session.add(item)
+    db.session.commit()
+    return jsonify({'success': True, 'sub_ingredient': item.to_dict()}), 201
+
+
+@app.route('/api/bar/sub-ingredient/<int:item_id>', methods=['PUT'])
+@login_required
+def update_sub_ingredient(item_id):
+    item = SubIngredient.query.get_or_404(item_id)
+    data = request.get_json()
+    item.name = data.get('name', item.name)
+    item.category = data.get('category', item.category)
+    item.unit = data.get('unit', item.unit)
+    item.cost_per_unit = float(data.get('cost_per_unit', item.cost_per_unit))
+    item.current_stock = float(data.get('current_stock', item.current_stock))
+    item.minimum_stock = float(data.get('minimum_stock', item.minimum_stock))
+    item.notes = data.get('notes', item.notes)
+    db.session.commit()
+    return jsonify({'success': True, 'sub_ingredient': item.to_dict()})
+
+
+@app.route('/api/bar/sub-ingredient/<int:item_id>', methods=['DELETE'])
+@login_required
+def delete_sub_ingredient(item_id):
+    item = SubIngredient.query.get_or_404(item_id)
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# --- Cocktail Recipe CRUD ---
+
+@app.route('/api/bar/cocktail', methods=['POST'])
+@login_required
+def add_cocktail():
+    data = request.get_json()
+    recipe = CocktailRecipe(
+        name=data['name'],
+        description=data.get('description'),
+        sell_price=float(data.get('sell_price', 0)),
+    )
+    db.session.add(recipe)
+    db.session.flush()  # get id before adding ingredients
+    for ing_data in data.get('ingredients', []):
+        ing = CocktailIngredient(
+            recipe_id=recipe.id,
+            spirit_id=ing_data.get('spirit_id'),
+            sub_ingredient_id=ing_data.get('sub_ingredient_id'),
+            quantity=float(ing_data.get('quantity', 1)),
+            notes=ing_data.get('notes'),
+        )
+        db.session.add(ing)
+    db.session.commit()
+    return jsonify({'success': True, 'recipe': recipe.to_dict()}), 201
+
+
+@app.route('/api/bar/cocktail/<int:recipe_id>', methods=['GET'])
+@login_required
+def get_cocktail(recipe_id):
+    recipe = CocktailRecipe.query.get_or_404(recipe_id)
+    return jsonify(recipe.to_dict())
+
+
+@app.route('/api/bar/cocktail/<int:recipe_id>', methods=['PUT'])
+@login_required
+def update_cocktail(recipe_id):
+    recipe = CocktailRecipe.query.get_or_404(recipe_id)
+    data = request.get_json()
+    recipe.name = data.get('name', recipe.name)
+    recipe.description = data.get('description', recipe.description)
+    recipe.sell_price = float(data.get('sell_price', recipe.sell_price))
+    recipe.is_active = data.get('is_active', recipe.is_active)
+    # Replace ingredients if provided
+    if 'ingredients' in data:
+        for ing in recipe.ingredients:
+            db.session.delete(ing)
+        db.session.flush()
+        for ing_data in data['ingredients']:
+            ing = CocktailIngredient(
+                recipe_id=recipe.id,
+                spirit_id=ing_data.get('spirit_id'),
+                sub_ingredient_id=ing_data.get('sub_ingredient_id'),
+                quantity=float(ing_data.get('quantity', 1)),
+                notes=ing_data.get('notes'),
+            )
+            db.session.add(ing)
+    db.session.commit()
+    return jsonify({'success': True, 'recipe': recipe.to_dict()})
+
+
+@app.route('/api/bar/cocktail/<int:recipe_id>', methods=['DELETE'])
+@login_required
+def delete_cocktail(recipe_id):
+    recipe = CocktailRecipe.query.get_or_404(recipe_id)
+    db.session.delete(recipe)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# --- Waste & Spillage ---
+
+@app.route('/api/bar/waste', methods=['POST'])
+@login_required
+def bar_record_waste():
+    data = request.get_json()
+    waste_type = data.get('waste_type', 'spirit')
+    quantity = float(data.get('quantity', 1))
+    cost_impact = 0.0
+
+    spirit_id = data.get('spirit_id')
+    sub_id = data.get('sub_ingredient_id')
+
+    if waste_type == 'spirit' and spirit_id:
+        spirit = Spirit.query.get_or_404(spirit_id)
+        cost_impact = round(spirit.cost_per_measure * quantity, 4)
+        # Deduct from stock
+        spirit.current_measures = round(max(0, spirit.current_measures - quantity), 4)
+    elif waste_type == 'sub_ingredient' and sub_id:
+        item = SubIngredient.query.get_or_404(sub_id)
+        cost_impact = round(item.cost_per_unit * quantity, 4)
+        item.current_stock = round(max(0, item.current_stock - quantity), 4)
+
+    waste = BarWaste(
+        date=datetime.strptime(data.get('date', date.today().isoformat()), '%Y-%m-%d').date(),
+        waste_type=waste_type,
+        spirit_id=spirit_id if waste_type == 'spirit' else None,
+        sub_ingredient_id=sub_id if waste_type == 'sub_ingredient' else None,
+        quantity=quantity,
+        reason=data.get('reason'),
+        cost_impact=cost_impact,
+    )
+    db.session.add(waste)
+    db.session.commit()
+    return jsonify({'success': True, 'waste': waste.to_dict()})
+
+
+@app.route('/api/bar/wastes')
+@login_required
+def get_bar_wastes():
+    wastes = BarWaste.query.order_by(BarWaste.date.desc()).limit(100).all()
+    return jsonify([w.to_dict() for w in wastes])
+
+
+@app.route('/api/bar/stock-snapshot')
+@login_required
+def bar_stock_snapshot():
+    spirits = Spirit.query.order_by(Spirit.category, Spirit.name).all()
+    sub_ingredients = SubIngredient.query.order_by(SubIngredient.category, SubIngredient.name).all()
+    return jsonify({
+        'spirits': [s.to_dict() for s in spirits],
+        'sub_ingredients': [i.to_dict() for i in sub_ingredients],
+    })
+
+
+@app.route('/api/bar/analysis')
+@login_required
+def bar_analysis():
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    sales = BarSale.query.filter(BarSale.date >= first_of_month).all()
+    wastes = BarWaste.query.filter(BarWaste.date >= first_of_month).all()
+    purchases = SpiritPurchase.query.filter(
+        SpiritPurchase.date_ordered >= first_of_month,
+        SpiritPurchase.is_invoice_cleared == True
+    ).all()
+
+    total_revenue = sum((s.unit_price or 0) * s.quantity for s in sales)
+    total_waste_cost = sum(w.cost_impact or 0 for w in wastes)
+    total_purchase_cost = sum((p.cost_per_bottle or 0) * p.bottles_ordered for p in purchases)
+
+    cocktail_breakdown = {}
+    spirit_breakdown = {}
+    for s in sales:
+        if s.sale_type == 'cocktail' and s.cocktail:
+            k = s.cocktail.name
+            if k not in cocktail_breakdown:
+                cocktail_breakdown[k] = {'qty': 0, 'revenue': 0}
+            cocktail_breakdown[k]['qty'] += s.quantity
+            cocktail_breakdown[k]['revenue'] = round(
+                cocktail_breakdown[k]['revenue'] + (s.unit_price or 0) * s.quantity, 2)
+        elif s.sale_type == 'shot' and s.spirit:
+            k = s.spirit.name
+            if k not in spirit_breakdown:
+                spirit_breakdown[k] = {'qty': 0, 'revenue': 0}
+            spirit_breakdown[k]['qty'] += s.quantity
+            spirit_breakdown[k]['revenue'] = round(
+                spirit_breakdown[k]['revenue'] + (s.unit_price or 0) * s.quantity, 2)
+
+    return jsonify({
+        'month_label': today.strftime('%B %Y'),
+        'total_revenue': round(total_revenue, 2),
+        'total_waste_cost': round(total_waste_cost, 2),
+        'total_purchase_cost': round(total_purchase_cost, 2),
+        'cocktail_breakdown': sorted(cocktail_breakdown.items(), key=lambda x: x[1]['revenue'], reverse=True),
+        'spirit_breakdown': sorted(spirit_breakdown.items(), key=lambda x: x[1]['revenue'], reverse=True),
+    })
 
 
 # ---------------------------------------------------------------------------

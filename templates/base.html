@@ -502,7 +502,7 @@
         </div>        <div class="sidebar-nav">
             <div class="nav-label">Management</div>
             <div class="nav-item">
-                <a href="{{ url_for('wine_stock') }}" class="nav-link active" id="nav-wines">
+                <a href="{{ url_for('wine_stock') }}" class="nav-link {% if request.endpoint == 'wine_stock' %}active{% endif %}" id="nav-wines">
                     <i class="fas fa-wine-bottle"></i>
                     <span>Wines</span>
                 </a>
@@ -515,10 +515,9 @@
                 </a>
             </div>
             <div class="nav-item">
-                <a href="#" class="nav-link nav-link-soon" id="nav-bar" tabindex="-1" onclick="return false;">
+                <a href="{{ url_for('bar_stock') }}" class="nav-link {% if request.endpoint == 'bar_stock' %}active{% endif %}" id="nav-bar">
                     <i class="fas fa-glass-martini-alt"></i>
                     <span>Bar</span>
-                    <span class="soon-badge">Soon</span>
                 </a>
             </div>
             <div class="nav-item">
