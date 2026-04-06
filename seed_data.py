@@ -523,9 +523,14 @@ def seed_spirits(supplier_map):
     }
 
     created = 0
+    # Explicitly low-stock spirits for demonstration (just 3)
+    LOW_STOCK_NAMES = {'Poire William', 'Champagne Ruinart BLC de BLC', 'Zacapa'}
     for name, d in spirits_data.items():
         if not Spirit.query.filter_by(name=name).first():
             measures = round(d['stock_bottles'] * (700 / 35.5), 2)
+            # Boost most spirits well above threshold; keep only 3 intentionally low
+            if name not in LOW_STOCK_NAMES:
+                measures = max(measures, round((d['min_stock'] + 3) * (700 / 35.5), 2))
             spirit = Spirit(
                 name=name,
                 category=d['category'],
