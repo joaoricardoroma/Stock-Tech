@@ -947,6 +947,48 @@
 
   .bottle-pct.text-coral { color: var(--bar-coral) !important; }
 
+  .bottle-last-sold {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .bottle-last-sold i { opacity: 0.6; }
+
+  /* Selected day card highlight */
+  .wine-weekly-day-card.selected {
+    border-color: var(--bar-teal) !important;
+    box-shadow: 0 0 0 2px rgba(0,212,170,0.25), var(--card-shadow) !important;
+  }
+
+  /* Day detail sale cards grid */
+  .bar-day-sales-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .bar-day-sale-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.2s ease;
+  }
+  .bar-day-sale-card:hover { border-color: rgba(0,212,170,0.3); background: rgba(0,212,170,0.04); }
+  .bar-sale-card-icon { font-size: 18px; margin-bottom: 4px; }
+  .bar-sale-card-name { font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+  .bar-sale-card-type { font-size: 10px; font-weight: 500; text-transform: capitalize; }
+  .bar-sale-card-stats { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .bar-sale-stat { display: flex; flex-direction: column; }
+  .bar-sale-stat-val { font-size: 14px; font-weight: 700; font-family: 'Outfit', sans-serif; color: var(--text-primary); }
+  .bar-sale-stat-lbl { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
   /* ===== RECIPE CARDS GRID ===== */
   .recipe-cards-grid {
     display: grid;
@@ -1993,7 +2035,7 @@
           <i class="fas fa-cubes"></i>
           {{ '%.1f'|format(s.current_measures) }} measures left · min {{ s.minimum_stock_bottles }}btl
         </div>
-        <button class="btn-glass" onclick="openModal('barPurchaseModal')" style="padding:5px 12px;font-size:12px;">Order</button>
+        <button class="btn-glass" onclick="orderSpirit({{ s.id }}, '{{ s.name|e }}', '{{ s.supplier_name|e if s.supplier_name else '' }}', {{ s.minimum_stock_bottles + 2 }}, {{ s.cost_price }})" style="padding:5px 12px;font-size:12px;">Order</button>
       </div>
     </div>
     {% endfor %}
@@ -2040,10 +2082,12 @@
         oninput="filterVisual('search',null,this.value)" style="width:150px;padding:5px 10px;font-size:12px;">
     </div>
   </div>
+
   <div class="visual-stock-grid" id="visualStockGrid">
     {% for s in spirits %}
     {% set pct = [[(s.current_measures / (s.minimum_stock_bottles * (s.bottle_size_ml / s.measure_ml)) *
     100)|round(0)|int, 0]|max, 100]|min %}
+    {% set bottles_left = (s.current_measures / (s.bottle_size_ml / s.measure_ml))|round(1) %}
     <div class="bottle-card {% if pct <= 25 %}low{% elif pct >= 75 %}full{% endif %}" id="visCard{{ s.id }}"
       data-cat="{{ s.category }}" data-name="{{ s.name|lower }}">
       <div class="bottle-fill-track">
@@ -2051,8 +2095,13 @@
       </div>
       <div class="bottle-info">
         <div class="bottle-name" title="{{ s.name }}">{{ s.name }}</div>
-        <div class="bottle-meta">{{ '%.0f'|format(s.current_measures) }}m</div>
-        <div class="bottle-pct{% if pct <= 25 %} text-coral{% endif %}">{{ pct }}%</div>
+        <div class="bottle-meta" style="font-size:14px;font-weight:700;color:{% if pct <= 25 %}var(--bar-coral){% else %}var(--bar-teal){% endif %};">
+          {{ bottles_left }}b
+        </div>
+        <div class="bottle-pct{% if pct <= 25 %} text-coral{% endif %}" style="font-size:10px;margin-top:2px;">{{ '%.0f'|format(s.current_measures) }}m · {{ pct }}%</div>
+        <div class="bottle-last-sold">
+          <i class="fas fa-clock"></i> Last Sold: {{ s.last_sold_date if s.last_sold_date else 'Never' }}
+        </div>
       </div>
     </div>
     {% endfor %}
@@ -2254,19 +2303,19 @@
   <!-- Live refresh KPIs -->
   <div class="an-kpi-grid" id="anKpiGrid" style="margin-top:6px;">
     <div class="an-kpi-card">
-      <div class="an-kpi-label" style="color:var(--bar-teal);"><i class="fas fa-rotate" style="margin-right:4px;"></i>Month Revenue</div>
+      <div class="an-kpi-label" style="color:var(--bar-teal);">Month Revenue</div>
       <div class="an-kpi-val" id="anRevenue" style="color:var(--bar-teal);">—</div>
     </div>
     <div class="an-kpi-card">
-      <div class="an-kpi-label" style="color:var(--bar-coral);"><i class="fas fa-rotate" style="margin-right:4px;"></i>Waste Cost</div>
+      <div class="an-kpi-label" style="color:var(--bar-coral);">Waste Cost</div>
       <div class="an-kpi-val" id="anWaste" style="color:var(--bar-coral);">—</div>
     </div>
     <div class="an-kpi-card">
-      <div class="an-kpi-label" style="color:var(--bar-amber);"><i class="fas fa-rotate" style="margin-right:4px;"></i>Purchase Cost</div>
+      <div class="an-kpi-label" style="color:var(--bar-amber);">Purchase Cost</div>
       <div class="an-kpi-val" id="anPurchases" style="color:var(--bar-amber);">—</div>
     </div>
     <div class="an-kpi-card">
-      <div class="an-kpi-label" style="color:var(--bar-green);"><i class="fas fa-rotate" style="margin-right:4px;"></i>Net Profit Est.</div>
+      <div class="an-kpi-label" style="color:var(--bar-green);">Net Profit Est.</div>
       <div class="an-kpi-val" id="anProfit" style="color:var(--bar-green);">—</div>
     </div>
   </div>
@@ -2307,22 +2356,38 @@
   function closeModal(id) { document.getElementById(id)?.classList.remove('active'); }
   document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active'); });
 
-  /* ── WEEKLY DAY DETAIL ── */
+  /* ── WEEKLY DAY DETAIL (card style, same as Wine) ── */
   function showBarDayDetail(idx) {
     const day = BAR_WEEKLY[idx];
     if (!day) return;
+    // Deselect all, highlight active
+    document.querySelectorAll('.wine-weekly-day-card').forEach(c => c.classList.remove('selected'));
+    const card = document.getElementById('barDayCard' + idx);
+    if (card) card.classList.add('selected');
     const panel = document.getElementById('barDayDetailPanel');
-    document.getElementById('barDayDetailTitle').textContent = day.day_name + ' ' + day.date_formatted;
+    document.getElementById('barDayDetailTitle').textContent = day.day_name + ' — ' + day.date_formatted;
     document.getElementById('barDayDetailRevBadge').textContent = '€' + day.total_revenue.toFixed(2);
     const details = day.sale_details || {};
     const keys = Object.keys(details);
     const body = document.getElementById('barDayDetailBody');
     if (!keys.length) {
-      body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">No sales recorded.</p>';
+      body.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:12px 0;">No sales recorded for this day.</p>';
     } else {
-      body.innerHTML = '<table class="data-table"><thead><tr><th>Item</th><th>Type</th><th>Qty</th><th>Revenue</th></tr></thead><tbody>' +
-        keys.map(k => `<tr><td>${k}</td><td>${details[k].type}</td><td>${details[k].qty}</td><td style="color:var(--bar-teal);">€${details[k].revenue.toFixed(2)}</td></tr>`).join('') +
-        '</tbody></table>';
+      const sorted = keys.sort((a, b) => details[b].revenue - details[a].revenue);
+      body.innerHTML = '<div class="bar-day-sales-grid">' + sorted.map(k => {
+        const d = details[k];
+        const typeColor = d.type === 'cocktail' ? 'var(--bar-purple)' : 'var(--bar-teal)';
+        const typeIcon = d.type === 'cocktail' ? 'fa-blender' : 'fa-whiskey-glass';
+        return `<div class="bar-day-sale-card">
+          <div class="bar-sale-card-icon" style="color:${typeColor};"><i class="fas ${typeIcon}"></i></div>
+          <div class="bar-sale-card-name">${k}</div>
+          <div class="bar-sale-card-type" style="color:${typeColor};">${d.type}</div>
+          <div class="bar-sale-card-stats">
+            <span class="bar-sale-stat"><span class="bar-sale-stat-val">${d.qty}</span><span class="bar-sale-stat-lbl">sold</span></span>
+            <span class="bar-sale-stat"><span class="bar-sale-stat-val" style="color:var(--bar-teal);">€${d.revenue.toFixed(2)}</span><span class="bar-sale-stat-lbl">revenue</span></span>
+          </div>
+        </div>`;
+      }).join('') + '</div>';
     }
     panel.style.display = 'block';
   }
@@ -2337,7 +2402,7 @@
 
   /* ── VISUAL STOCK FILTER ── */
   function filterVisual(mode, btn, q) {
-    document.querySelectorAll('.weekly-cards-row .btn-glass').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#sectionBarVisual .btn-glass').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
     document.querySelectorAll('.bottle-card').forEach(c => {
       if (mode === 'all') c.style.display = '';
@@ -2377,14 +2442,14 @@
       current_measures: parseFloat(document.getElementById('spiritStock').value) || 0,
       minimum_stock_bottles: parseFloat(document.getElementById('spiritMinStock').value) || 1,
     };
-    const url = id ? `/api/bar/spirits/${id}` : '/api/bar/spirits';
+    const url = id ? `/api/bar/spirit/${id}` : '/api/bar/spirit';
     const method = id ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (res.ok) location.reload(); else alert('Error saving spirit');
+    if (res.ok) location.reload(); else { const err = await res.json().catch(()=>({})); alert('Error saving spirit: ' + (err.error||res.status)); }
   }
   async function deleteSpirit(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    const res = await fetch(`/api/bar/spirits/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/bar/spirit/${id}`, { method: 'DELETE' });
     if (res.ok) document.getElementById('spiritRow' + id)?.remove(); else alert('Error deleting spirit');
   }
 
@@ -2404,6 +2469,26 @@
     const isCocktail = type === 'cocktail';
     document.getElementById('spiritSaleRow').style.display = isCocktail ? 'none' : 'flex';
     document.getElementById('cocktailSaleRow').style.display = isCocktail ? 'flex' : 'none';
+    // Auto-fill price when switching type
+    if (!isCocktail) autoFillSpiritPrice();
+  }
+  function autoFillSpiritPrice() {
+    const sel = document.getElementById('saleSpiritId');
+    if (!sel) return;
+    const spiritId = parseInt(sel.value);
+    const spirit = BAR_SPIRITS.find(s => s.id === spiritId);
+    if (spirit && spirit.shot_retail_price) {
+      document.getElementById('salePrice').value = spirit.shot_retail_price.toFixed(2);
+    }
+  }
+  function autoFillPurchaseCost() {
+    const sel = document.getElementById('purchaseSpiritId');
+    if (!sel) return;
+    const spiritId = parseInt(sel.value);
+    const spirit = BAR_SPIRITS.find(s => s.id === spiritId);
+    if (spirit && spirit.cost_price) {
+      document.getElementById('purchaseCostPerBottle').value = spirit.cost_price.toFixed(2);
+    }
   }
   async function saveSale() {
     const type = document.getElementById('saleSpiritOrCocktail').value;
@@ -2415,8 +2500,8 @@
       unit_price: parseFloat(document.getElementById('salePrice').value) || 0,
       date: document.getElementById('saleDate').value,
     };
-    const res = await fetch('/api/bar/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (res.ok) location.reload(); else alert('Error recording sale');
+    const res = await fetch('/api/bar/sale', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else { const err = await res.json().catch(()=>({})); alert('Error recording sale: ' + (err.error||res.status)); }
   }
 
   /* ── WASTE MODAL ── */
@@ -2433,20 +2518,47 @@
   }
 
   /* ── PURCHASE MODAL ── */
+  function orderSpirit(spiritId, spiritName, supplierName, suggestedBottles, costPerBottle) {
+    /* Pre-fill purchase modal from Alerts "Order" button */
+    const sel = document.getElementById('purchaseSpiritId');
+    if (sel) { for (let o of sel.options) { if (parseInt(o.value) === spiritId) { o.selected = true; break; } } }
+    // Pre-fill supplier
+    const supSel = document.getElementById('purchaseSupplier');
+    if (supSel && supplierName) {
+      // Try to find matching option
+      let found = false;
+      for (let o of supSel.options) { if (o.value.toLowerCase() === supplierName.toLowerCase()) { o.selected = true; found = true; break; } }
+      // If not found, set as text value by selecting first or leaving
+      if (!found && supSel.tagName === 'INPUT') supSel.value = supplierName;
+    }
+    // Pre-fill bottles (suggested order quantity)
+    const btlEl = document.getElementById('purchaseBottles');
+    if (btlEl && suggestedBottles) btlEl.value = suggestedBottles;
+    // Pre-fill cost
+    const costEl = document.getElementById('purchaseCostPerBottle');
+    if (costEl && costPerBottle) costEl.value = costPerBottle.toFixed(2);
+    openModal('barPurchaseModal');
+  }
   async function savePurchase() {
     const payload = {
       spirit_id: parseInt(document.getElementById('purchaseSpiritId').value) || null,
-      bottles_ordered: parseFloat(document.getElementById('purchaseBottles').value) || 0,
+      bottles_ordered: parseInt(document.getElementById('purchaseBottles').value) || 1,
       cost_per_bottle: parseFloat(document.getElementById('purchaseCostPerBottle').value) || 0,
-      date_ordered: document.getElementById('purchaseDate').value,
-      supplier: document.getElementById('purchaseSupplier').value,
+      date: document.getElementById('purchaseDate').value,
     };
-    const res = await fetch('/api/bar/purchases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (res.ok) location.reload(); else alert('Error creating purchase');
+    const res = await fetch('/api/bar/spirit/purchase', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (res.ok) location.reload(); else { const err = await res.json().catch(()=>({})); alert('Error creating purchase: ' + (err.error||res.status)); }
   }
-  async function clearInvoice(id) {
-    const res = await fetch(`/api/bar/purchases/${id}/clear`, { method: 'POST' });
-    if (res.ok) location.reload(); else alert('Error clearing invoice');
+  async function clearInvoice(purchaseId) {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*,application/pdf';
+    input.onchange = async () => {
+      const file = input.files[0]; if (!file) return;
+      const fd = new FormData(); fd.append('invoice_image', file);
+      const res = await fetch(`/api/bar/spirit/clear-invoice/${purchaseId}`, { method: 'POST', body: fd });
+      if (res.ok) location.reload(); else { const err = await res.json().catch(()=>({})); alert('Error clearing invoice: ' + (err.error||res.status)); }
+    };
+    input.click();
   }
 
   /* ── ADD/EDIT SUB-INGREDIENT ── */
@@ -2466,15 +2578,15 @@
       category: document.getElementById('subIngCategory').value,
       unit: document.getElementById('subIngUnit').value,
     };
-    const url = id ? `/api/bar/sub-ingredients/${id}` : '/api/bar/sub-ingredients';
+    const url = id ? `/api/bar/sub-ingredient/${id}` : '/api/bar/sub-ingredient';
     const method = id ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (res.ok) location.reload(); else alert('Error saving mixer');
+    if (res.ok) location.reload(); else { const err = await res.json().catch(()=>({})); alert('Error saving mixer: ' + (err.error||res.status)); }
   }
   async function deleteSubIng(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    const res = await fetch(`/api/bar/sub-ingredients/${id}`, { method: 'DELETE' });
-    if (res.ok) document.getElementById('subIngCard' + id)?.remove(); else alert('Error');
+    const res = await fetch(`/api/bar/sub-ingredient/${id}`, { method: 'DELETE' });
+    if (res.ok) document.getElementById('subIngCard' + id)?.remove(); else alert('Error deleting mixer');
   }
 
   /* ── ADD/EDIT COCKTAIL ── */
@@ -2512,21 +2624,26 @@
   }
   async function saveCocktail() {
     const id = document.getElementById('cocktailId').value;
+    const ingredients = ingRows.map(r => ({
+      spirit_id: r.type === 'spirit' ? (r.ref_id || null) : null,
+      sub_ingredient_id: r.type === 'sub' ? (r.ref_id || null) : null,
+      quantity: r.qty,
+    }));
     const payload = {
       name: document.getElementById('cocktailName').value,
       description: document.getElementById('cocktailDesc').value,
       sell_price: parseFloat(document.getElementById('cocktailSellPrice').value) || 0,
-      ingredients: ingRows.map(r => ({ type: r.type, ref_id: r.ref_id, quantity: r.qty })),
+      ingredients,
     };
-    const url = id ? `/api/bar/cocktails/${id}` : '/api/bar/cocktails';
+    const url = id ? `/api/bar/cocktail/${id}` : '/api/bar/cocktail';
     const method = id ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    if (res.ok) location.reload(); else alert('Error saving recipe');
+    if (res.ok) location.reload(); else { const err = await res.json().catch(()=>({})); alert('Error saving recipe: ' + (err.error||res.status)); }
   }
   async function deleteRecipe(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    const res = await fetch(`/api/bar/cocktails/${id}`, { method: 'DELETE' });
-    if (res.ok) location.reload(); else alert('Error');
+    const res = await fetch(`/api/bar/cocktail/${id}`, { method: 'DELETE' });
+    if (res.ok) location.reload(); else alert('Error deleting recipe');
   }
 
   /* ── ANALYSIS ── */
@@ -2556,7 +2673,7 @@
     </div>`).join('');
   }
 
-  /* ── PDF WEEKLY BAR SALES (wine-style) ── */
+  /* ── PDF WEEKLY BAR SALES ── */
   function downloadBarWeekPDF() {
     const btn = document.getElementById('btnBarWeekPDF');
     if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...'; btn.disabled = true; }
@@ -2564,146 +2681,148 @@
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const marginL = 14, marginR = 14, usableW = pageW - marginL - marginR;
       const wkLabel = document.getElementById('barWeekLabelDisplay')?.textContent || 'This Week';
       const genDate = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
+      function checkPage(y, needed) {
+        if (y + needed > pageH - 16) { doc.addPage(); return 28; }
+        return y;
+      }
+
       // ---- Header ----
       doc.setFillColor(7, 7, 13);
-      doc.rect(0, 0, pageW, 30, 'F');
+      doc.rect(0, 0, pageW, 28, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
+      doc.setFontSize(18);
       doc.setTextColor(0, 212, 170);
-      doc.text('StockTech', 14, 13);
-      doc.setFontSize(11);
-      doc.setTextColor(200, 200, 200);
-      doc.text('Weekly Bar Sales Analysis', 14, 21);
+      doc.text('StockTech', marginL, 12);
       doc.setFontSize(10);
+      doc.setTextColor(200, 200, 200);
+      doc.text('Weekly Bar Sales Analysis', marginL, 20);
+      doc.setFontSize(9);
       doc.setTextColor(160, 160, 160);
-      doc.text(wkLabel, pageW - 14, 14, { align: 'right' });
-      doc.text('Generated: ' + genDate, pageW - 14, 21, { align: 'right' });
+      doc.text(wkLabel, pageW - marginR, 12, { align: 'right' });
+      doc.text('Generated: ' + genDate, pageW - marginR, 20, { align: 'right' });
 
       // ---- Day-by-day breakdown ----
-      let y = 40;
+      let y = 36;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
+      doc.setFontSize(12);
       doc.setTextColor(255, 255, 255);
-      doc.text('Day-by-Day Breakdown', 14, y);
-      y += 8;
+      doc.text('Day-by-Day Breakdown', marginL, y);
+      y += 7;
 
+      const colW = [28, 26, 30, 26, 26, usableW - 136];
       const cols = ['Day', 'Date', 'Revenue (€)', 'Items Sold', 'Waste (€)', 'Top Item'];
-      const colW = [26, 26, 28, 24, 24, pageW - 14 - 14 - 128];
-      let x = 14;
-      doc.setFillColor(30, 30, 50);
-      doc.rect(14, y, pageW - 28, 8, 'F');
-      doc.setFontSize(9);
+      let x = marginL;
+      y = checkPage(y, 10);
+      doc.setFillColor(25, 25, 45);
+      doc.rect(marginL, y, usableW, 8, 'F');
+      doc.setFontSize(8.5);
       doc.setTextColor(0, 212, 170);
       cols.forEach((col, i) => { doc.text(col, x + 2, y + 5.5); x += colW[i]; });
       y += 8;
 
       let totalRev = 0, totalUnits = 0, totalWaste = 0;
       BAR_WEEKLY.forEach((day, idx) => {
+        y = checkPage(y, 8);
         const isToday = day.is_today;
-        doc.setFillColor(idx % 2 === 0 ? 20 : 28, idx % 2 === 0 ? 20 : 28, idx % 2 === 0 ? 35 : 45);
-        if (isToday) doc.setFillColor(20, 40, 30);
-        doc.rect(14, y, pageW - 28, 7, 'F');
+        doc.setFillColor(idx % 2 === 0 ? 18 : 26, idx % 2 === 0 ? 18 : 26, idx % 2 === 0 ? 32 : 42);
+        if (isToday) doc.setFillColor(18, 38, 28);
+        doc.rect(marginL, y, usableW, 7, 'F');
 
         const details = day.sale_details || {};
         const topItem = Object.entries(details).sort(([,a],[,b]) => b.revenue - a.revenue)[0];
-        const topName = topItem ? topItem[0].substring(0, 20) + (topItem[0].length > 20 ? '…' : '') : '—';
+        const topName = topItem ? topItem[0].substring(0, 22) + (topItem[0].length > 22 ? '…' : '') : '—';
 
         doc.setFont('helvetica', isToday ? 'bold' : 'normal');
         doc.setFontSize(8.5);
-        x = 14;
-        const rowData = [
-          day.day_name, day.date_formatted,
-          '€' + (day.total_revenue || 0).toFixed(2),
-          String(day.total_units || 0),
-          day.total_waste_cost > 0 ? '€' + day.total_waste_cost.toFixed(2) : '—',
-          topName
-        ];
-        rowData.forEach((val, i) => {
+        x = marginL;
+        [day.day_name, day.date_formatted,
+         '€' + (day.total_revenue||0).toFixed(2),
+         String(day.total_units||0),
+         day.total_waste_cost > 0 ? '€' + day.total_waste_cost.toFixed(2) : '—',
+         topName
+        ].forEach((val, i) => {
           if (i === 2) doc.setTextColor(0, 212, 170);
-          else if (i === 4) doc.setTextColor(251, 113, 133);
-          else doc.setTextColor(isToday ? 150 : 200, isToday ? 220 : 200, isToday ? 150 : 200);
+          else if (i === 4 && val !== '—') doc.setTextColor(251, 113, 133);
+          else doc.setTextColor(isToday ? 160 : 210, isToday ? 220 : 210, isToday ? 160 : 210);
           doc.text(val, x + 2, y + 4.8);
           x += colW[i];
         });
-        totalRev += (day.total_revenue || 0);
-        totalUnits += (day.total_units || 0);
-        totalWaste += (day.total_waste_cost || 0);
+        totalRev += (day.total_revenue||0);
+        totalUnits += (day.total_units||0);
+        totalWaste += (day.total_waste_cost||0);
         y += 7;
       });
 
       // Totals row
-      doc.setFillColor(0, 212, 170, 40);
-      doc.rect(14, y, pageW - 28, 8, 'F');
-      x = 14;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      y = checkPage(y, 10);
+      doc.setFillColor(0, 80, 60);
+      doc.rect(marginL, y, usableW, 8, 'F');
+      x = marginL;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
       doc.setTextColor(0, 212, 170);
-      doc.text('WEEK TOTAL', x + 2, y + 5.5); x += colW[0];
-      doc.text('', x + 2, y + 5.5); x += colW[1];
-      doc.text('€' + totalRev.toFixed(2), x + 2, y + 5.5); x += colW[2];
-      doc.setTextColor(200, 200, 200);
-      doc.text(String(totalUnits), x + 2, y + 5.5); x += colW[3];
-      doc.setTextColor(251, 113, 133);
-      doc.text('€' + totalWaste.toFixed(2), x + 2, y + 5.5);
+      doc.text('WEEK TOTAL', x+2, y+5.5); x += colW[0];
+      x += colW[1];
+      doc.text('€' + totalRev.toFixed(2), x+2, y+5.5); x += colW[2];
+      doc.setTextColor(200,200,200);
+      doc.text(String(totalUnits), x+2, y+5.5); x += colW[3];
+      doc.setTextColor(251,113,133);
+      doc.text('€' + totalWaste.toFixed(2), x+2, y+5.5);
       y += 16;
 
       // ---- Top items breakdown ----
       const allItems = {};
       BAR_WEEKLY.forEach(day => {
-        Object.entries(day.sale_details || {}).forEach(([name, vals]) => {
-          if (!allItems[name]) allItems[name] = { revenue: 0, qty: 0, type: vals.type };
+        Object.entries(day.sale_details||{}).forEach(([name, vals]) => {
+          if (!allItems[name]) allItems[name] = { revenue:0, qty:0, type:vals.type };
           allItems[name].revenue += vals.revenue;
           allItems[name].qty += vals.qty;
         });
       });
-      const itemList = Object.entries(allItems).sort(([,a],[,b]) => b.revenue - a.revenue).filter(([,v]) => v.revenue > 0);
+      const itemList = Object.entries(allItems).sort(([,a],[,b]) => b.revenue-a.revenue).filter(([,v]) => v.revenue > 0);
       if (itemList.length > 0) {
-        if (y > 145) { doc.addPage(); y = 20; }
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(13);
-        doc.setTextColor(255, 255, 255);
-        doc.text('Top Sellers This Week', 14, y);
+        y = checkPage(y, 14);
+        doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(255,255,255);
+        doc.text('Top Sellers This Week', marginL, y); y += 7;
+        const iColW = [usableW-110, 40, 28, 42];
+        x = marginL;
+        y = checkPage(y, 10);
+        doc.setFillColor(25,25,45);
+        doc.rect(marginL, y, usableW, 8, 'F');
+        doc.setFontSize(9); doc.setTextColor(0,212,170);
+        ['Item','Type','Qty','Revenue'].forEach((col,i) => { doc.text(col, x+2, y+5.5); x += iColW[i]; });
         y += 8;
-        const iCols = ['Item', 'Type', 'Qty Sold', 'Revenue'];
-        const iColW = [pageW - 28 - 40 - 28 - 40, 40, 28, 40];
-        x = 14;
-        doc.setFillColor(30, 30, 50);
-        doc.rect(14, y, pageW - 28, 8, 'F');
-        doc.setFontSize(9);
-        doc.setTextColor(0, 212, 170);
-        iCols.forEach((col, i) => { doc.text(col, x + 2, y + 5.5); x += iColW[i]; });
-        y += 8;
-        itemList.slice(0, 12).forEach(([name, v], idx) => {
-          doc.setFillColor(idx % 2 === 0 ? 20 : 28, idx % 2 === 0 ? 20 : 28, idx % 2 === 0 ? 35 : 45);
-          doc.rect(14, y, pageW - 28, 7, 'F');
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(8.5);
-          x = 14;
-          doc.setTextColor(200, 200, 200);
-          doc.text(name.substring(0, 40), x + 2, y + 4.8); x += iColW[0];
-          doc.setTextColor(160, 170, 190);
-          doc.text(v.type, x + 2, y + 4.8); x += iColW[1];
-          doc.text(String(v.qty), x + 2, y + 4.8); x += iColW[2];
-          doc.setTextColor(0, 212, 170);
-          doc.text('€' + v.revenue.toFixed(2), x + 2, y + 4.8);
+        itemList.slice(0,12).forEach(([name,v], idx) => {
+          y = checkPage(y, 8);
+          doc.setFillColor(idx%2===0?18:26, idx%2===0?18:26, idx%2===0?32:42);
+          doc.rect(marginL, y, usableW, 7, 'F');
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+          x = marginL;
+          doc.setTextColor(210,210,210);
+          doc.text(name.substring(0,40), x+2, y+4.8); x += iColW[0];
+          doc.setTextColor(160,170,190);
+          doc.text(v.type, x+2, y+4.8); x += iColW[1];
+          doc.text(String(v.qty), x+2, y+4.8); x += iColW[2];
+          doc.setTextColor(0,212,170);
+          doc.text('€'+v.revenue.toFixed(2), x+2, y+4.8);
           y += 7;
         });
       }
 
       // Footer
-      const fy = y + 4;
-      doc.setFillColor(0, 212, 170);
-      doc.rect(14, fy, pageW - 28, 0.5, 'F');
-      doc.setTextColor(120, 140, 160);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Stock-Tech · Confidential · Bar Management System', pageW / 2, fy + 8, { align: 'center' });
+      y = checkPage(y, 14);
+      doc.setFillColor(0,212,170);
+      doc.rect(marginL, y+4, usableW, 0.4, 'F');
+      doc.setTextColor(120,140,160); doc.setFontSize(7.5);
+      doc.setFont('helvetica','normal');
+      doc.text('Stock-Tech · Confidential · Bar Management System', pageW/2, y+12, { align:'center' });
 
-      doc.save('Bar_Weekly_Sales_' + wkLabel.replace(/[^a-z0-9]/gi, '_') + '.pdf');
-    } catch (err) {
+      doc.save('Bar_Weekly_Sales_' + wkLabel.replace(/[^a-z0-9]/gi,'_') + '.pdf');
+    } catch(err) {
       console.error('PDF error', err);
       alert('PDF generation failed: ' + err.message);
     } finally {
@@ -2719,6 +2838,15 @@
     ['saleSpiritId', 'wasteSpiritId', 'purchaseSpiritId'].forEach(id => {
       const el = document.getElementById(id); if (el) el.innerHTML = '<option value="">Select spirit…</option>' + spiritOpts;
     });
+    // Auto-fill shot price when spirit is selected in sale modal
+    const saleSel = document.getElementById('saleSpiritId');
+    if (saleSel) saleSel.addEventListener('change', autoFillSpiritPrice);
+    // Trigger once on load to populate default
+    autoFillSpiritPrice();
+    // Auto-fill cost/bottle when spirit is selected in purchase modal
+    const purchSel = document.getElementById('purchaseSpiritId');
+    if (purchSel) purchSel.addEventListener('change', autoFillPurchaseCost);
+    autoFillPurchaseCost();
     const cSel = document.getElementById('saleCocktailId'); if (cSel) cSel.innerHTML = '<option value="">Select cocktail…</option>' + cocktailOpts;
     const sdate = document.getElementById('saleDate'); if (sdate) sdate.value = BAR_TODAY;
     const wdate = document.getElementById('wasteDate'); if (wdate) wdate.value = BAR_TODAY;

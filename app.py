@@ -839,7 +839,17 @@ def bar_stock():
     low_stock_spirits = [s for s in spirits if s.is_below_threshold]
     pending_purchases = SpiritPurchase.query.filter_by(is_invoice_cleared=False).all()
 
-    spirits_data = [s.to_dict() for s in spirits]
+    spirits_data = []
+    for s in spirits:
+        last_sale = BarSale.query.filter(
+            (BarSale.spirit_id == s.id) | 
+            BarSale.cocktail_id.in_(
+                db.session.query(CocktailIngredient.recipe_id).filter(CocktailIngredient.spirit_id == s.id)
+            )
+        ).order_by(BarSale.date.desc()).first()
+        d = s.to_dict()
+        d['last_sold_date'] = last_sale.date.strftime('%d %b') if last_sale else 'Never'
+        spirits_data.append(d)
     recipes_data = [r.to_dict() for r in recipes]
     sub_ingredients_data = [i.to_dict() for i in sub_ingredients]
 
