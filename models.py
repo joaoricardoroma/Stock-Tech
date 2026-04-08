@@ -467,7 +467,7 @@ class CocktailRecipe(db.Model):
 
     # Relationships
     ingredients = db.relationship('CocktailIngredient', backref='recipe',
-                                   lazy='select', cascade='all, delete-orphan')
+                                   lazy='selectin', cascade='all, delete-orphan')
     sales = db.relationship('BarSale', backref='cocktail', lazy='dynamic')
 
     @property

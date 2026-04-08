@@ -597,6 +597,32 @@
     color: var(--bar-coral);
   }
 
+  /* ===== MODAL CLOSE BUTTON (top-right, wine-style) ===== */
+  .modal-close-bar {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--glass-border);
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .modal-close-bar:hover {
+    background: var(--bar-coral-dim);
+    border-color: rgba(251,113,133,0.3);
+    color: var(--bar-coral);
+  }
+
   /* ===== RECIPE CARDS ===== */
   .recipe-grid {
     display: grid;
@@ -2152,7 +2178,7 @@
           <td style="font-size:12px;color:var(--text-muted);">{{ s.supplier_name or '—' }}</td>
           <td class="td-num">€{{ '%.2f'|format(s.cost_price) }}</td>
           <td>{{ s.measure_ml }}ml</td>
-          <td class="td-num" style="color:var(--bar-coral);">€{{ '%.4f'|format(s.cost_per_measure) }}</td>
+          <td class="td-num" style="color:var(--bar-coral);">€{{ '%.2f'|format(s.cost_per_measure) }}</td>
           <td class="td-num" style="color:var(--bar-teal);font-weight:700;">€{{ '%.2f'|format(s.shot_retail_price or 0) }}</td>
           <td class="td-num"><span class="margin-badge">{{ s.target_margin_percent }}%</span></td>
           <td class="td-num">
@@ -2180,41 +2206,18 @@
       <span class="section-icon" style="background:var(--bar-purple-dim);color:var(--bar-purple);"><i
           class="fas fa-blender"></i></span>
       <h2 class="section-h2">Cocktail Recipes</h2>
-      <span class="section-badge" style="background:var(--bar-purple-dim);color:var(--bar-purple);">{{ recipes|length }}
+      <span class="section-badge" style="background:var(--bar-purple-dim);color:var(--bar-purple);" id="recipeCountBadge">{{ recipes|length }}
         recipes</span>
     </div>
-    <button class="btn-glass" onclick="openModal('addCocktailModal')" id="btnAddRecipe2"><i class="fas fa-plus"
-        style="color:var(--bar-purple);"></i> New Recipe</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn-glass" onclick="downloadCocktailPDF()" id="btnCocktailPDF"><i class="fas fa-file-pdf"
+          style="color:var(--bar-coral);"></i> Download PDF</button>
+      <button class="btn-glass" onclick="openModal('addCocktailModal')" id="btnAddRecipe2"><i class="fas fa-plus"
+          style="color:var(--bar-purple);"></i> New Recipe</button>
+    </div>
   </div>
   <div class="recipe-cards-grid" id="recipeGrid">
-    {% for r in recipes %}
-    <div class="recipe-card" id="recipeCard{{ r.id }}">
-      <div class="recipe-card-header">
-        <div style="flex:1;min-width:0;">
-          <div class="recipe-name">{{ r.name }}</div>
-          <div class="recipe-desc">{{ r.description or '' }}</div>
-        </div>
-        <div class="recipe-price" style="flex-shrink:0;">€{{ '%.2f'|format(r.sell_price) }}</div>
-      </div>
-      <div class="recipe-ings" id="recipeIngs{{ r.id }}">
-        {% for ing in r.ingredients %}
-        <span class="ing-pill {% if ing.spirit_id %}spirit-pill{% else %}{% endif %}">
-          {{ ing.spirit.name if ing.spirit else (ing.sub_ingredient.name if ing.sub_ingredient else '?') }}
-          <span style="opacity:.7;">×{{ ing.quantity }}</span>
-        </span>
-        {% endfor %}
-      </div>
-      <div class="recipe-footer">
-        <button class="btn-tbl" onclick="sellCocktail({{ r.id }},{{ r.sell_price }},'{{ r.name|e }}')"
-          id="sellCocktailBtn{{ r.id }}" style="color:var(--bar-teal);"><i class="fas fa-cash-register"></i>
-          Sell</button>
-        <button class="btn-tbl" onclick="editCocktail({{ r.id }})" id="editCocktailBtn{{ r.id }}"><i
-            class="fas fa-pen"></i></button>
-        <button class="btn-tbl del" onclick="deleteRecipe({{ r.id }},'{{ r.name|e }}')" id="delCocktailBtn{{ r.id }}"><i
-            class="fas fa-trash"></i></button>
-      </div>
-    </div>
-    {% endfor %}
+    <!-- Rendered by JS from BAR_RECIPES JSON to ensure correct ingredient names -->
   </div>
 </section>
 
@@ -2830,24 +2833,137 @@
     }
   }
 
+  /* ── RENDER RECIPE CARDS FROM JSON (fixes ? ingredient bug) ── */
+  function renderRecipeCards() {
+    const grid = document.getElementById('recipeGrid');
+    if (!grid) return;
+    if (!BAR_RECIPES.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted);"><i class="fas fa-blender" style="font-size:32px;display:block;margin-bottom:10px;opacity:.4;"></i>No cocktail recipes yet.</div>';
+      return;
+    }
+    grid.innerHTML = BAR_RECIPES.map(r => {
+      const ingHtml = (r.ingredients || []).map(ing => {
+        const name = ing.name || '?';
+        const isSpirit = ing.type === 'spirit';
+        return `<span class="ing-pill ${isSpirit ? 'spirit-pill' : ''}">${name}<span style="opacity:.7;">&times;${ing.quantity}</span></span>`;
+      }).join('');
+      const eName = (r.name || '').replace(/'/g, "\\'");
+      return `<div class="recipe-card" id="recipeCard${r.id}">
+        <div class="recipe-card-header">
+          <div style="flex:1;min-width:0;"><div class="recipe-name">${r.name}</div><div class="recipe-desc">${r.description || ''}</div></div>
+          <div class="recipe-price" style="flex-shrink:0;">&euro;${r.sell_price.toFixed(2)}</div>
+        </div>
+        <div class="recipe-ings" id="recipeIngs${r.id}">${ingHtml || '<span style="color:var(--text-muted);font-size:12px;font-style:italic;">No ingredients</span>'}</div>
+        <div class="recipe-footer">
+          <button class="btn-tbl" onclick="sellCocktail(${r.id},${r.sell_price},'${eName}')" id="sellCocktailBtn${r.id}" style="color:var(--bar-teal);"><i class="fas fa-cash-register"></i> Sell</button>
+          <button class="btn-tbl" onclick="editCocktail(${r.id})" id="editCocktailBtn${r.id}"><i class="fas fa-pen"></i></button>
+          <button class="btn-tbl del" onclick="deleteRecipe(${r.id},'${eName}')" id="delCocktailBtn${r.id}"><i class="fas fa-trash"></i></button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  /* ── DOWNLOAD COCKTAIL RECIPES PDF ── */
+  function downloadCocktailPDF() {
+    const btn = document.getElementById('btnCocktailPDF');
+    if (btn) { btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...'; btn.disabled = true; }
+    try {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const mL = 14, mR = 14, usableW = pageW - mL - mR;
+      const genDate = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
+      function chk(y, need) { if (y + need > pageH - 16) { doc.addPage(); return 22; } return y; }
+
+      // Header
+      doc.setFillColor(7,7,13); doc.rect(0,0,pageW,26,'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(0,212,170);
+      doc.text('StockTech', mL, 11);
+      doc.setFontSize(9); doc.setTextColor(200,200,200); doc.text('Cocktail Recipe Book', mL, 19);
+      doc.setTextColor(120,140,160); doc.setFontSize(8);
+      doc.text('Generated: ' + genDate, pageW - mR, 11, {align:'right'});
+      doc.text(BAR_RECIPES.length + ' recipes', pageW - mR, 19, {align:'right'});
+
+      let y = 34;
+      doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(255,255,255);
+      doc.text('Cocktail Recipe Book', mL, y); y += 4;
+      doc.setFillColor(139,92,246); doc.rect(mL, y, 48, 0.7, 'F'); y += 9;
+
+      BAR_RECIPES.forEach((r, idx) => {
+        const ings = r.ingredients || [];
+        const rows = Math.ceil(ings.length / 2) || 1;
+        const cardH = 22 + rows * 6;
+        y = chk(y, cardH + 4);
+        // Card bg
+        doc.setFillColor(idx%2===0?16:22, idx%2===0?16:22, idx%2===0?30:38);
+        doc.roundedRect(mL, y-2, usableW, cardH, 3, 3, 'F');
+        // Purple left bar
+        doc.setFillColor(139,92,246); doc.rect(mL, y-2, 3, cardH, 'F');
+        // Recipe name
+        doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(255,255,255);
+        doc.text(r.name, mL+7, y+7);
+        // Price
+        doc.setFillColor(0,70,50); doc.roundedRect(pageW-mR-22, y+1, 22, 8, 2, 2, 'F');
+        doc.setFontSize(9); doc.setTextColor(0,212,170);
+        doc.text('\u20ac' + r.sell_price.toFixed(2), pageW-mR-11, y+6.4, {align:'center'});
+        // Description
+        if (r.description) {
+          doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(160,160,180);
+          doc.text(r.description.substring(0,65), mL+7, y+14);
+          y += 3;
+        }
+        y += 17;
+        // Ingredients
+        if (ings.length) {
+          doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+          ings.forEach((ing, i) => {
+            const col = i % 2;
+            const xi = mL + 7 + col * (usableW / 2);
+            doc.setTextColor(ing.type === 'spirit' ? 0 : 245, ing.type === 'spirit' ? 212 : 158, ing.type === 'spirit' ? 170 : 11);
+            doc.text('\u25cf', xi, y);
+            doc.setTextColor(220,220,220);
+            doc.text((ing.name||'?') + '  \u00d7' + ing.quantity, xi+4, y);
+            if (col===1 || i===ings.length-1) y += 6;
+          });
+        } else {
+          doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(120,120,140);
+          doc.text('No ingredients recorded', mL+7, y); y += 6;
+        }
+        y += 6;
+      });
+
+      // Footer
+      y = chk(y, 14);
+      doc.setFillColor(0,212,170); doc.rect(mL, y+2, usableW, 0.4, 'F');
+      doc.setTextColor(120,140,160); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+      doc.text('Stock-Tech \u00b7 Confidential \u00b7 Bar Management System', pageW/2, y+10, {align:'center'});
+
+      doc.save('Cocktail_Recipes_' + genDate.replace(/[^a-z0-9]/gi,'_') + '.pdf');
+    } catch(e) {
+      console.error('Cocktail PDF error', e);
+      alert('PDF generation failed: ' + e.message);
+    } finally {
+      if (btn) { btn.innerHTML = '<i class="fas fa-file-pdf" style="color:var(--bar-coral);"></i> Download PDF'; btn.disabled = false; }
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     loadBarAnalysis();
+    renderRecipeCards();
     // populate selects
     const spiritOpts = BAR_SPIRITS.map(s => `<option value="${s.id}">${s.name} (${s.category})</option>`).join('');
     const cocktailOpts = BAR_RECIPES.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
     ['saleSpiritId', 'wasteSpiritId', 'purchaseSpiritId'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.innerHTML = '<option value="">Select spirit…</option>' + spiritOpts;
+      const el = document.getElementById(id); if (el) el.innerHTML = '<option value="">Select spirit\u2026</option>' + spiritOpts;
     });
-    // Auto-fill shot price when spirit is selected in sale modal
     const saleSel = document.getElementById('saleSpiritId');
     if (saleSel) saleSel.addEventListener('change', autoFillSpiritPrice);
-    // Trigger once on load to populate default
     autoFillSpiritPrice();
-    // Auto-fill cost/bottle when spirit is selected in purchase modal
     const purchSel = document.getElementById('purchaseSpiritId');
     if (purchSel) purchSel.addEventListener('change', autoFillPurchaseCost);
     autoFillPurchaseCost();
-    const cSel = document.getElementById('saleCocktailId'); if (cSel) cSel.innerHTML = '<option value="">Select cocktail…</option>' + cocktailOpts;
+    const cSel = document.getElementById('saleCocktailId'); if (cSel) cSel.innerHTML = '<option value="">Select cocktail\u2026</option>' + cocktailOpts;
     const sdate = document.getElementById('saleDate'); if (sdate) sdate.value = BAR_TODAY;
     const wdate = document.getElementById('wasteDate'); if (wdate) wdate.value = BAR_TODAY;
     const pdate = document.getElementById('purchaseDate'); if (pdate) pdate.value = BAR_TODAY;
@@ -2862,9 +2978,9 @@
 <div class="modal-overlay modal-glass" id="addSpiritModal">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="spiritModalTitle">Add Spirit</h5><button class="btn-tbl"
-          onclick="closeModal('addSpiritModal');document.getElementById('spiritId').value=''">✕</button>
+      <div class="modal-header" style="position:relative;">
+        <h5 class="modal-title" id="spiritModalTitle">Add Spirit</h5>
+        <button class="modal-close-bar" onclick="closeModal('addSpiritModal');document.getElementById('spiritId').value=''" id="closeSpiritModal"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="spiritId">
@@ -2923,9 +3039,9 @@
 <div class="modal-overlay modal-glass" id="barSaleModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="saleModalTitle">Record Sale</h5><button class="btn-tbl"
-          onclick="closeModal('barSaleModal')">✕</button>
+      <div class="modal-header" style="position:relative;">
+        <h5 class="modal-title" id="saleModalTitle">Record Sale</h5>
+        <button class="modal-close-bar" onclick="closeModal('barSaleModal')" id="closeSaleModal"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
         <div style="margin-bottom:10px;"><label class="form-label-sm">Type</label>
@@ -2959,9 +3075,9 @@
 <div class="modal-overlay modal-glass" id="barWasteModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Log Waste / Spillage</h5><button class="btn-tbl"
-          onclick="closeModal('barWasteModal')">✕</button>
+      <div class="modal-header" style="position:relative;">
+        <h5 class="modal-title">Log Waste / Spillage</h5>
+        <button class="modal-close-bar" onclick="closeModal('barWasteModal')" id="closeWasteModal"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
         <div style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select class="form-select-glass"
@@ -2988,9 +3104,9 @@
 <div class="modal-overlay modal-glass" id="barPurchaseModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">New Purchase Order</h5><button class="btn-tbl"
-          onclick="closeModal('barPurchaseModal')">✕</button>
+      <div class="modal-header" style="position:relative;">
+        <h5 class="modal-title">New Purchase Order</h5>
+        <button class="modal-close-bar" onclick="closeModal('barPurchaseModal')" id="closePurchaseModal"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
         <div style="margin-bottom:10px;"><label class="form-label-sm">Spirit</label><select class="form-select-glass"
@@ -3024,9 +3140,9 @@
 <div class="modal-overlay modal-glass" id="addCocktailModal">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="cocktailModalTitle">Add Recipe</h5><button class="btn-tbl"
-          onclick="closeModal('addCocktailModal');document.getElementById('cocktailId').value=''">✕</button>
+      <div class="modal-header" style="position:relative;">
+        <h5 class="modal-title" id="cocktailModalTitle">Add Recipe</h5>
+        <button class="modal-close-bar" onclick="closeModal('addCocktailModal');document.getElementById('cocktailId').value=''" id="closeCocktailModal"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="cocktailId">
@@ -3061,9 +3177,9 @@
 <div class="modal-overlay modal-glass" id="addSubIngModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Add Mixer / Sub-Ingredient</h5><button class="btn-tbl"
-          onclick="closeModal('addSubIngModal');document.getElementById('subIngId').value=''">✕</button>
+      <div class="modal-header" style="position:relative;">
+        <h5 class="modal-title">Add Mixer / Sub-Ingredient</h5>
+        <button class="modal-close-bar" onclick="closeModal('addSubIngModal');document.getElementById('subIngId').value=''" id="closeSubIngModal"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="subIngId">

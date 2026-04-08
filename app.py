@@ -26,7 +26,9 @@ from flask_login import (
     LoginManager, login_user, logout_user,
     login_required, current_user
 )
+from flask_caching import Cache
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.orm import joinedload, selectinload
 
 from models import (db, User, Supplier, Wine, WineSale, WinePurchase, WineComp,
                      Spirit, SpiritSale, SpiritPurchase, SubIngredient,
@@ -59,6 +61,24 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 db.init_app(app)
+
+# ---------------------------------------------------------------------------
+# Cache — SimpleCache (in-process, single worker)
+# Upgrade to RedisCache by changing CACHE_TYPE + CACHE_REDIS_URL in .env
+# when running multiple Gunicorn workers.
+# ---------------------------------------------------------------------------
+cache = Cache(app, config={
+    'CACHE_TYPE': 'SimpleCache',
+    'CACHE_DEFAULT_TIMEOUT': 600,  # 10 minutes
+})
+
+# Auto-invalidate cache after every DB commit — covers all write routes
+# (sales, purchases, waste, CRUD) without touching each route individually.
+from sqlalchemy import event as sa_event
+
+@sa_event.listens_for(db.session, 'after_commit')
+def _clear_cache_on_commit(session):
+    cache.clear()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -132,22 +152,22 @@ def wine_stock():
     monday = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
     sunday = monday + timedelta(days=6)
     week_label = f"{monday.strftime('%d %b')} – {sunday.strftime('%d %b %Y')}"
+    first_of_month = today.replace(day=1)
 
-    weekly_sales = WineSale.query.filter(
-        WineSale.date >= monday,
-        WineSale.date <= sunday
-    ).all()
-
-    weekly_purchases = WinePurchase.query.filter(
-        WinePurchase.date_ordered >= monday,
-        WinePurchase.date_ordered <= sunday
-    ).all()
-
-    # Weekly comps for the selected week
-    weekly_comps = WineComp.query.filter(
-        WineComp.date >= monday,
-        WineComp.date <= sunday
-    ).all()
+    # Eager-load .wine on all weekly queries → .wine.name in the loop below is free
+    weekly_sales = (WineSale.query
+                    .options(joinedload(WineSale.wine))
+                    .filter(WineSale.date >= monday, WineSale.date <= sunday)
+                    .all())
+    weekly_purchases = (WinePurchase.query
+                        .options(joinedload(WinePurchase.wine))
+                        .filter(WinePurchase.date_ordered >= monday,
+                                WinePurchase.date_ordered <= sunday)
+                        .all())
+    weekly_comps = (WineComp.query
+                    .options(joinedload(WineComp.wine))
+                    .filter(WineComp.date >= monday, WineComp.date <= sunday)
+                    .all())
 
     # Build day-by-day data
     day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -164,10 +184,9 @@ def wine_stock():
         total_ordered = sum(p.quantity_ordered for p in day_purchases)
         total_comps = sum(c.quantity for c in day_comps)
 
-        # Wine-level detail for clicked day (sales)
         wine_details = {}
         for s in day_sales:
-            wname = s.wine.name if s.wine else 'Unknown'
+            wname = s.wine.name if s.wine else 'Unknown'  # already in identity map
             if wname not in wine_details:
                 wine_details[wname] = {'sold': 0, 'ordered': 0, 'wine_id': s.wine_id,
                                         'glasses_sold': 0, 'bottles_sold': 0}
@@ -178,16 +197,15 @@ def wine_stock():
                 wine_details[wname]['bottles_sold'] += s.quantity_sold
 
         for p in day_purchases:
-            wname = p.wine.name if p.wine else 'Unknown'
+            wname = p.wine.name if p.wine else 'Unknown'  # already in identity map
             if wname not in wine_details:
                 wine_details[wname] = {'sold': 0, 'ordered': 0, 'wine_id': p.wine_id,
                                         'glasses_sold': 0, 'bottles_sold': 0}
             wine_details[wname]['ordered'] += p.quantity_ordered
 
-        # Wine-level comp details
         comp_details = {}
         for c in day_comps:
-            wname = c.wine.name if c.wine else 'Unknown'
+            wname = c.wine.name if c.wine else 'Unknown'  # already in identity map
             if wname not in comp_details:
                 comp_details[wname] = {'total': 0, 'glasses': 0, 'bottles': 0, 'wine_id': c.wine_id}
             comp_details[wname]['total'] += c.quantity
@@ -223,92 +241,93 @@ def wine_stock():
     # --- Low Stock Alerts ---
     low_stock_wines = [w for w in wines if w.is_below_threshold]
 
-    # --- KPI Calculations ---
-    total_stock_value = sum(w.stock_value for w in wines)
-    total_cost_spent = sum(w.cost_price * w.current_stock_qty for w in wines)
+    # --- KPIs (cached 10 min, cleared on any write) ---
+    kpis = cache.get('wine_kpis')
+    if kpis is None:
+        total_stock_value = sum(w.stock_value for w in wines)
+        total_cost_spent = sum(w.cost_price * w.current_stock_qty for w in wines)
 
-    # Monthly sales data for profit calculation
-    first_of_month = today.replace(day=1)
-    month_sales = WineSale.query.filter(WineSale.date >= first_of_month).all()
+        # Eager-load .wine so revenue loop has no hidden queries
+        month_sales = (WineSale.query
+                       .options(joinedload(WineSale.wine))
+                       .filter(WineSale.date >= first_of_month)
+                       .all())
 
-    total_revenue = 0
-    total_cost_of_sold = 0
-    wine_sales_count = {}
-    wine_margin_data = {}
+        total_revenue = 0.0
+        total_cost_of_sold = 0.0
+        wine_sales_count = {}
+        wine_margin_data = {}
 
-    for sale in month_sales:
-        wine = sale.wine
-        if wine:
-            # Revenue: bottle price always; glass = bottle_price / glasses_per_bottle
-            if sale.sale_type == 'glass':
-                unit_price = (wine.retail_price or 0) / wine.glasses_per_bottle
-                unit_cost = wine.cost_price / wine.glasses_per_bottle
-            else:
-                unit_price = wine.retail_price or 0
-                unit_cost = wine.cost_price
+        for sale in month_sales:
+            wine = sale.wine  # already loaded — zero extra queries
+            if wine:
+                if sale.sale_type == 'glass':
+                    gpb = wine.glasses_per_bottle or 1
+                    unit_price = (wine.retail_price or 0) / gpb
+                    unit_cost = wine.cost_price / gpb
+                else:
+                    unit_price = wine.retail_price or 0
+                    unit_cost = wine.cost_price
+                total_revenue += unit_price * sale.quantity_sold
+                total_cost_of_sold += unit_cost * sale.quantity_sold
+                wine_sales_count[wine.name] = wine_sales_count.get(wine.name, 0) + sale.quantity_sold
+                if wine.name not in wine_margin_data:
+                    wine_margin_data[wine.name] = wine.target_margin_percent or 0
 
-            revenue = unit_price * sale.quantity_sold
-            cost = unit_cost * sale.quantity_sold
-            total_revenue += revenue
-            total_cost_of_sold += cost
+        total_profit = round(total_revenue - total_cost_of_sold, 2)
+        top_wine = max(wine_sales_count, key=wine_sales_count.get) if wine_sales_count else 'N/A'
+        top_wine_qty = wine_sales_count.get(top_wine, 0) if top_wine != 'N/A' else 0
+        highest_margin_wine = max(wine_margin_data, key=wine_margin_data.get) if wine_margin_data else 'N/A'
+        highest_margin_pct = wine_margin_data.get(highest_margin_wine, 0) if highest_margin_wine != 'N/A' else 0
 
-            if wine.name not in wine_sales_count:
-                wine_sales_count[wine.name] = 0
-            wine_sales_count[wine.name] += sale.quantity_sold
+        kpis = {
+            'total_stock_value': round(total_stock_value, 2),
+            'total_cost_spent': round(total_cost_spent, 2),
+            'total_profit': total_profit,
+            'total_revenue': round(total_revenue, 2),
+            'top_wine': top_wine,
+            'top_wine_qty': top_wine_qty,
+            'highest_margin_wine': highest_margin_wine,
+            'highest_margin_pct': round(highest_margin_pct, 1),
+            'low_stock_count': len(low_stock_wines),
+            'total_wines': len(wines),
+        }
+        cache.set('wine_kpis', kpis, timeout=600)
 
-            if wine.name not in wine_margin_data:
-                wine_margin_data[wine.name] = wine.target_margin_percent or 0
+    # ── FIXED N+1: one GROUP BY for monthly sold per wine (was O(N×M) python filter) ──
+    monthly_sold_rows = (db.session.query(WineSale.wine_id,
+                                          db.func.sum(WineSale.quantity_sold))
+                         .filter(WineSale.date >= first_of_month)
+                         .group_by(WineSale.wine_id)
+                         .all())
+    monthly_sold_by_wine = {r[0]: int(r[1] or 0) for r in monthly_sold_rows}
 
-    total_profit = round(total_revenue - total_cost_of_sold, 2)
-    top_wine = max(wine_sales_count, key=wine_sales_count.get) if wine_sales_count else 'N/A'
-    top_wine_qty = wine_sales_count.get(top_wine, 0) if top_wine != 'N/A' else 0
-    highest_margin_wine = max(wine_margin_data, key=wine_margin_data.get) if wine_margin_data else 'N/A'
-    highest_margin_pct = wine_margin_data.get(highest_margin_wine, 0) if highest_margin_wine != 'N/A' else 0
+    # ── FIXED N+1: one GROUP BY for last-sold date per wine (was N WineSale queries) ──
+    last_sold_rows = (db.session.query(WineSale.wine_id,
+                                       db.func.max(WineSale.date))
+                      .group_by(WineSale.wine_id)
+                      .all())
+    last_sold_map = {r[0]: r[1] for r in last_sold_rows}
 
-    # Wine data enriched with monthly sales
+    # ── FIXED N+1: one GROUP BY for invoice counts (was N WinePurchase.count() queries) ──
+    inv_count_rows = (db.session.query(WinePurchase.wine_id,
+                                       db.func.count(WinePurchase.id))
+                      .filter(WinePurchase.is_invoice_cleared == True,
+                              WinePurchase.invoice_image_path.isnot(None))
+                      .group_by(WinePurchase.wine_id)
+                      .all())
+    invoice_counts = {r[0]: int(r[1] or 0) for r in inv_count_rows}
+
+    # Build wines_data with zero per-wine DB queries
     wines_data = []
     for w in wines:
-        monthly_sold = sum(
-            s.quantity_sold for s in month_sales if s.wine_id == w.id
-        )
-        last_sale = WineSale.query.filter_by(wine_id=w.id).order_by(
-            WineSale.date.desc()
-        ).first()
-        last_sold_date = last_sale.date.strftime('%d %b') if last_sale else 'Never'
+        last_date = last_sold_map.get(w.id)
+        d = w.to_dict()
+        d['monthly_sold'] = monthly_sold_by_wine.get(w.id, 0)
+        d['last_sold_date'] = last_date.strftime('%d %b') if last_date else 'Never'
+        d['invoice_count'] = invoice_counts.get(w.id, 0)
+        wines_data.append(d)
 
-        wines_data.append({
-            **w.to_dict(),
-            'monthly_sold': monthly_sold,
-            'last_sold_date': last_sold_date,
-        })
-
-    kpis = {
-        'total_stock_value': round(total_stock_value, 2),
-        'total_cost_spent': round(total_cost_spent, 2),
-        'total_profit': total_profit,
-        'total_revenue': round(total_revenue, 2),
-        'top_wine': top_wine,
-        'top_wine_qty': top_wine_qty,
-        'highest_margin_wine': highest_margin_wine,
-        'highest_margin_pct': round(highest_margin_pct, 1),
-        'low_stock_count': len(low_stock_wines),
-        'total_wines': len(wines),
-    }
-
-    # invoice counts per wine for gallery column
-    invoice_counts = {}
-    for wine in wines:
-        count = WinePurchase.query.filter_by(
-            wine_id=wine.id,
-            is_invoice_cleared=True
-        ).filter(WinePurchase.invoice_image_path.isnot(None)).count()
-        invoice_counts[wine.id] = count
-
-    # Add invoice_count into wines_data
-    for w in wines_data:
-        w['invoice_count'] = invoice_counts.get(w['id'], 0)
-
-    # Weekly comps total for badge
     week_comps_total = sum(d['total_comps'] for d in weekly_comps_data)
 
     return render_template('wine_stock.html',
@@ -323,6 +342,7 @@ def wine_stock():
                            today=today.isoformat(),
                            week_offset=week_offset,
                            week_label=week_label)
+
 
 
 # ---------------------------------------------------------------------------
@@ -539,11 +559,28 @@ def monthly_report_data():
     today = date.today()
     first_of_month = today.replace(day=1)
 
-    # All sales, purchases, and comps this month
-    month_sales = WineSale.query.filter(WineSale.date >= first_of_month).all()
-    month_purchases = WinePurchase.query.filter(WinePurchase.date_ordered >= first_of_month).all()
-    month_comps = WineComp.query.filter(WineComp.date >= first_of_month).all()
+    # Eager-load .wine → .wine.name in loops below fires zero extra queries
+    month_sales = (WineSale.query
+                   .options(joinedload(WineSale.wine))
+                   .filter(WineSale.date >= first_of_month).all())
+    month_purchases = (WinePurchase.query
+                       .options(joinedload(WinePurchase.wine))
+                       .filter(WinePurchase.date_ordered >= first_of_month).all())
+    month_comps = (WineComp.query
+                   .options(joinedload(WineComp.wine))
+                   .filter(WineComp.date >= first_of_month).all())
     wines = Wine.query.order_by(Wine.name).all()
+
+    # Pre-index by wine_id → O(1) lookup in summary loop (was O(N×M) per-wine filter)
+    sales_by_wine = {}
+    for s in month_sales:
+        sales_by_wine.setdefault(s.wine_id, []).append(s)
+    comps_by_wine = {}
+    for c in month_comps:
+        comps_by_wine.setdefault(c.wine_id, []).append(c)
+    purchases_by_wine = {}
+    for p in month_purchases:
+        purchases_by_wine.setdefault(p.wine_id, []).append(p)
 
     # Build week-by-week data for this month
     weeks = []
@@ -563,7 +600,7 @@ def monthly_report_data():
 
             wine_details = {}
             for s in d_sales:
-                wn = s.wine.name if s.wine else 'Unknown'
+                wn = s.wine.name if s.wine else 'Unknown'  # already in identity map
                 wine_details.setdefault(wn, {'sold': 0, 'ordered': 0, 'glasses_sold': 0, 'bottles_sold': 0})
                 wine_details[wn]['sold'] += s.quantity_sold
                 if s.sale_type == 'glass':
@@ -572,13 +609,13 @@ def monthly_report_data():
                     wine_details[wn]['bottles_sold'] += s.quantity_sold
 
             for p in d_purchases:
-                wn = p.wine.name if p.wine else 'Unknown'
+                wn = p.wine.name if p.wine else 'Unknown'  # already in identity map
                 wine_details.setdefault(wn, {'sold': 0, 'ordered': 0, 'glasses_sold': 0, 'bottles_sold': 0})
                 wine_details[wn]['ordered'] += p.quantity_ordered
 
             comp_details = {}
             for c in d_comps:
-                wn = c.wine.name if c.wine else 'Unknown'
+                wn = c.wine.name if c.wine else 'Unknown'  # already in identity map
                 comp_details.setdefault(wn, {'total': 0, 'glasses': 0, 'bottles': 0})
                 comp_details[wn]['total'] += c.quantity
                 if c.sale_type == 'glass':
@@ -608,24 +645,29 @@ def monthly_report_data():
         })
         wk_start += timedelta(weeks=1)
 
-    # Per-wine monthly summary
+    # Per-wine monthly summary — uses pre-indexed dicts, no per-wine queries
+    total_revenue_all = 0.0
     wine_summary = []
     for wine in wines:
-        sold_qty = sum(s.quantity_sold for s in month_sales if s.wine_id == wine.id)
-        comps_qty = sum(c.quantity for c in month_comps if c.wine_id == wine.id)
-        ordered = sum(p.quantity_ordered for p in month_purchases if p.wine_id == wine.id)
+        w_sales = sales_by_wine.get(wine.id, [])
+        w_comps = comps_by_wine.get(wine.id, [])
+        w_purchases = purchases_by_wine.get(wine.id, [])
 
-        # Revenue: per-sale pricing (glass vs bottle)
-        revenue = 0
-        cost = 0
-        for s in [s for s in month_sales if s.wine_id == wine.id]:
+        sold_qty = sum(s.quantity_sold for s in w_sales)
+        comps_qty = sum(c.quantity for c in w_comps)
+        ordered = sum(p.quantity_ordered for p in w_purchases)
+
+        revenue = 0.0
+        cost = 0.0
+        gpb = wine.glasses_per_bottle or 1
+        for s in w_sales:
             if s.sale_type == 'glass':
-                gpb = wine.glasses_per_bottle if wine.glasses_per_bottle else 1
                 revenue += ((wine.retail_price or 0) / gpb) * s.quantity_sold
                 cost += (wine.cost_price / gpb) * s.quantity_sold
             else:
                 revenue += (wine.retail_price or 0) * s.quantity_sold
                 cost += wine.cost_price * s.quantity_sold
+        total_revenue_all += revenue
 
         if sold_qty > 0 or ordered > 0 or comps_qty > 0:
             wine_summary.append({
@@ -647,14 +689,10 @@ def monthly_report_data():
             'total_sold': sum(s.quantity_sold for s in month_sales),
             'total_ordered': sum(p.quantity_ordered for p in month_purchases),
             'total_comps': sum(c.quantity for c in month_comps),
-            'total_revenue': round(sum(
-                ((w.retail_price or 0) / (w.glasses_per_bottle if s.sale_type == 'glass' and w.glasses_per_bottle else 1)
-                 if s.sale_type == 'glass' else (w.retail_price or 0)) * s.quantity_sold
-                for w in wines
-                for s in month_sales if s.wine_id == w.id
-            ), 2),
+            'total_revenue': round(total_revenue_all, 2),
         }
     })
+
 
 
 @app.route('/api/wine/<int:wine_id>', methods=['GET'])
@@ -761,16 +799,29 @@ def bar_stock():
 
     spirits = Spirit.query.order_by(Spirit.category, Spirit.name).all()
     sub_ingredients = SubIngredient.query.order_by(SubIngredient.category, SubIngredient.name).all()
-    recipes = CocktailRecipe.query.order_by(CocktailRecipe.name).all()
+
+    # Eager-load ingredients → spirit + sub_ingredient for each ingredient
+    # so recipes_data = [r.to_dict() for r in recipes] fires ZERO extra queries
+    recipes = (CocktailRecipe.query
+               .options(
+                   selectinload(CocktailRecipe.ingredients)
+                   .joinedload(CocktailIngredient.spirit),
+                   selectinload(CocktailRecipe.ingredients)
+                   .joinedload(CocktailIngredient.sub_ingredient),
+               )
+               .order_by(CocktailRecipe.name).all())
 
     today = date.today()
     monday = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
     sunday = monday + timedelta(days=6)
     week_label = f"{monday.strftime('%d %b')} – {sunday.strftime('%d %b %Y')}"
+    first_of_month = today.replace(day=1)
 
-    weekly_bar_sales = BarSale.query.filter(
-        BarSale.date >= monday, BarSale.date <= sunday
-    ).all()
+    # Eager-load .cocktail and .spirit → loop name lookups are free
+    weekly_bar_sales = (BarSale.query
+                        .options(joinedload(BarSale.cocktail), joinedload(BarSale.spirit))
+                        .filter(BarSale.date >= monday, BarSale.date <= sunday)
+                        .all())
     weekly_purchases = SpiritPurchase.query.filter(
         SpiritPurchase.date_ordered >= monday, SpiritPurchase.date_ordered <= sunday
     ).all()
@@ -790,7 +841,9 @@ def bar_stock():
 
         sale_details = {}
         for s in day_sales:
-            key = s.cocktail.name if s.sale_type == 'cocktail' and s.cocktail else (s.spirit.name if s.spirit else 'Unknown')
+            # .cocktail and .spirit are already in the identity map — no extra queries
+            key = (s.cocktail.name if s.sale_type == 'cocktail' and s.cocktail
+                   else (s.spirit.name if s.spirit else 'Unknown'))
             if key not in sale_details:
                 sale_details[key] = {'qty': 0, 'revenue': 0, 'type': s.sale_type}
             sale_details[key]['qty'] += s.quantity
@@ -808,62 +861,85 @@ def bar_stock():
             'is_past': day_date < today,
         })
 
-    # Monthly KPIs
-    first_of_month = today.replace(day=1)
-    month_bar_sales = BarSale.query.filter(BarSale.date >= first_of_month).all()
-    month_waste = BarWaste.query.filter(BarWaste.date >= first_of_month).all()
-    month_purchases = SpiritPurchase.query.filter(
-        SpiritPurchase.date_ordered >= first_of_month,
-        SpiritPurchase.is_invoice_cleared == True
-    ).all()
+    # --- Bar KPIs (cached 10 min, cleared on any write) ---
+    kpis = cache.get('bar_kpis')
+    if kpis is None:
+        month_bar_sales = (BarSale.query
+                           .options(joinedload(BarSale.cocktail), joinedload(BarSale.spirit))
+                           .filter(BarSale.date >= first_of_month)
+                           .all())
+        month_waste = BarWaste.query.filter(BarWaste.date >= first_of_month).all()
+        month_purchases = SpiritPurchase.query.filter(
+            SpiritPurchase.date_ordered >= first_of_month,
+            SpiritPurchase.is_invoice_cleared == True
+        ).all()
 
-    total_revenue = sum((s.unit_price or 0) * s.quantity for s in month_bar_sales)
-    total_waste_cost = sum(w.cost_impact or 0 for w in month_waste)
-    total_purchase_cost = sum(
-        (p.cost_per_bottle or 0) * p.bottles_ordered for p in month_purchases
-    )
+        total_revenue = sum((s.unit_price or 0) * s.quantity for s in month_bar_sales)
+        total_waste_cost = sum(w.cost_impact or 0 for w in month_waste)
+        total_purchase_cost = sum(
+            (p.cost_per_bottle or 0) * p.bottles_ordered for p in month_purchases
+        )
 
-    # Top cocktail & spirit
-    cocktail_counts = {}
-    shot_counts = {}
-    for s in month_bar_sales:
-        if s.sale_type == 'cocktail' and s.cocktail:
-            cocktail_counts[s.cocktail.name] = cocktail_counts.get(s.cocktail.name, 0) + s.quantity
-        elif s.sale_type == 'shot' and s.spirit:
-            shot_counts[s.spirit.name] = shot_counts.get(s.spirit.name, 0) + s.quantity
+        # .cocktail / .spirit already loaded — no hidden queries per row
+        cocktail_counts = {}
+        shot_counts = {}
+        for s in month_bar_sales:
+            if s.sale_type == 'cocktail' and s.cocktail:
+                cocktail_counts[s.cocktail.name] = cocktail_counts.get(s.cocktail.name, 0) + s.quantity
+            elif s.sale_type == 'shot' and s.spirit:
+                shot_counts[s.spirit.name] = shot_counts.get(s.spirit.name, 0) + s.quantity
 
-    top_cocktail = max(cocktail_counts, key=cocktail_counts.get) if cocktail_counts else 'N/A'
-    top_spirit = max(shot_counts, key=shot_counts.get) if shot_counts else 'N/A'
+        top_cocktail = max(cocktail_counts, key=cocktail_counts.get) if cocktail_counts else 'N/A'
+        top_spirit_kpi = max(shot_counts, key=shot_counts.get) if shot_counts else 'N/A'
+        total_stock_value = (sum(s.stock_value for s in spirits)
+                             + sum(i.stock_value for i in sub_ingredients))
 
-    total_stock_value = sum(s.stock_value for s in spirits) + sum(i.stock_value for i in sub_ingredients)
+        kpis = {
+            'total_revenue': round(total_revenue, 2),
+            'total_waste_cost': round(total_waste_cost, 2),
+            'total_purchase_cost': round(total_purchase_cost, 2),
+            'total_stock_value': round(total_stock_value, 2),
+            'low_stock_count': sum(1 for s in spirits if s.is_below_threshold),
+            'total_spirits': len(spirits),
+            'total_recipes': len(recipes),
+            'top_cocktail': top_cocktail,
+            'top_spirit': top_spirit_kpi,
+        }
+        cache.set('bar_kpis', kpis, timeout=600)
+
     low_stock_spirits = [s for s in spirits if s.is_below_threshold]
     pending_purchases = SpiritPurchase.query.filter_by(is_invoice_cleared=False).all()
 
+    # ── FIXED N+1: last sold date per spirit — 2 aggregate queries instead of N queries ──
+    # 1. Direct shot sales grouped by spirit
+    direct_rows = (db.session.query(BarSale.spirit_id, db.func.max(BarSale.date))
+                   .filter(BarSale.spirit_id.isnot(None))
+                   .group_by(BarSale.spirit_id)
+                   .all())
+    spirit_last_map = {r[0]: r[1] for r in direct_rows}
+
+    # 2. Via cocktail ingredient — join BarSale → CocktailIngredient grouped by spirit
+    cocktail_rows = (db.session.query(CocktailIngredient.spirit_id,
+                                      db.func.max(BarSale.date))
+                     .join(BarSale, BarSale.cocktail_id == CocktailIngredient.recipe_id)
+                     .filter(CocktailIngredient.spirit_id.isnot(None))
+                     .group_by(CocktailIngredient.spirit_id)
+                     .all())
+    for r in cocktail_rows:
+        existing = spirit_last_map.get(r[0])
+        spirit_last_map[r[0]] = max(existing, r[1]) if existing else r[1]
+
+    # Build spirits_data with zero per-spirit queries
     spirits_data = []
     for s in spirits:
-        last_sale = BarSale.query.filter(
-            (BarSale.spirit_id == s.id) | 
-            BarSale.cocktail_id.in_(
-                db.session.query(CocktailIngredient.recipe_id).filter(CocktailIngredient.spirit_id == s.id)
-            )
-        ).order_by(BarSale.date.desc()).first()
         d = s.to_dict()
-        d['last_sold_date'] = last_sale.date.strftime('%d %b') if last_sale else 'Never'
+        last_date = spirit_last_map.get(s.id)
+        d['last_sold_date'] = last_date.strftime('%d %b') if last_date else 'Never'
         spirits_data.append(d)
+
+    # recipes ingredients already selectin-loaded above — to_dict() is free
     recipes_data = [r.to_dict() for r in recipes]
     sub_ingredients_data = [i.to_dict() for i in sub_ingredients]
-
-    kpis = {
-        'total_revenue': round(total_revenue, 2),
-        'total_waste_cost': round(total_waste_cost, 2),
-        'total_purchase_cost': round(total_purchase_cost, 2),
-        'total_stock_value': round(total_stock_value, 2),
-        'low_stock_count': len(low_stock_spirits),
-        'total_spirits': len(spirits),
-        'total_recipes': len(recipes),
-        'top_cocktail': top_cocktail,
-        'top_spirit': top_spirit,
-    }
 
     return render_template('bar_stock.html',
                            spirits=spirits_data,
@@ -876,6 +952,8 @@ def bar_stock():
                            today=today.isoformat(),
                            week_offset=week_offset,
                            week_label=week_label)
+
+
 
 
 # --- Spirit CRUD ---
@@ -1228,7 +1306,10 @@ def bar_stock_snapshot():
 def bar_analysis():
     today = date.today()
     first_of_month = today.replace(day=1)
-    sales = BarSale.query.filter(BarSale.date >= first_of_month).all()
+    # Eager-load .cocktail and .spirit → name lookups in loop are free
+    sales = (BarSale.query
+             .options(joinedload(BarSale.cocktail), joinedload(BarSale.spirit))
+             .filter(BarSale.date >= first_of_month).all())
     wastes = BarWaste.query.filter(BarWaste.date >= first_of_month).all()
     purchases = SpiritPurchase.query.filter(
         SpiritPurchase.date_ordered >= first_of_month,
@@ -1243,14 +1324,14 @@ def bar_analysis():
     spirit_breakdown = {}
     for s in sales:
         if s.sale_type == 'cocktail' and s.cocktail:
-            k = s.cocktail.name
+            k = s.cocktail.name  # already in identity map
             if k not in cocktail_breakdown:
                 cocktail_breakdown[k] = {'qty': 0, 'revenue': 0}
             cocktail_breakdown[k]['qty'] += s.quantity
             cocktail_breakdown[k]['revenue'] = round(
                 cocktail_breakdown[k]['revenue'] + (s.unit_price or 0) * s.quantity, 2)
         elif s.sale_type == 'shot' and s.spirit:
-            k = s.spirit.name
+            k = s.spirit.name  # already in identity map
             if k not in spirit_breakdown:
                 spirit_breakdown[k] = {'qty': 0, 'revenue': 0}
             spirit_breakdown[k]['qty'] += s.quantity
