@@ -1,0 +1,826 @@
+{% extends 'base.html' %}
+{% block title %}Stock History — StockTech{% endblock %}
+
+{% block extra_styles %}
+<style>
+  /* ===== PAGE LAYOUT ===== */
+  .hist-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .hist-page-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  .hist-page-subtitle { font-size: 14px; color: var(--text-secondary); }
+
+  /* ===== FILTER BAR ===== */
+  .hist-filter-bar {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-end;
+  }
+  .hist-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 130px;
+  }
+  .hist-filter-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--text-muted);
+  }
+  .hist-filter-input,
+  .hist-filter-select {
+    background: #111827;
+    border: 1px solid var(--glass-border);
+    border-radius: 9px;
+    color: #e5e7eb;
+    padding: 8px 12px;
+    font-size: 13px;
+    outline: none;
+    transition: border 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .hist-filter-input:focus,
+  .hist-filter-select:focus {
+    border-color: rgba(212,164,74,0.5);
+    box-shadow: 0 0 0 3px rgba(212,164,74,0.08);
+  }
+  /* Force dropdown options to be dark — critical for readability */
+  .hist-filter-select option {
+    background: #111827 !important;
+    color: #e5e7eb !important;
+  }
+  .hist-filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .btn-hist-apply {
+    background: linear-gradient(135deg, var(--accent-gold, #d4a44a), #b8882e);
+    color: #000;
+    border: none;
+    border-radius: 9px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-hist-apply:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-hist-reset {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    border-radius: 9px;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-hist-reset:hover { border-color: var(--glass-border-hover); color: var(--text-primary); }
+
+  /* ===== SUMMARY PILLS ===== */
+  .hist-summary-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .hist-summary-pill {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .hist-summary-pill .pill-count {
+    background: rgba(212,164,74,0.15);
+    color: var(--accent-gold, #d4a44a);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ===== TIMELINE CONTAINER ===== */
+  .hist-timeline {
+    position: relative;
+    padding-left: 0;
+  }
+  .hist-date-group {
+    margin-bottom: 28px;
+  }
+  .hist-date-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hist-date-label i { opacity: 0.6; }
+
+  /* ===== ORDER GROUP — pending + cleared connector ===== */
+  .hist-order-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .hist-order-group::before {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 38px;
+    bottom: 38px;
+    width: 2px;
+    background: linear-gradient(to bottom, rgba(251,191,36,0.4), rgba(52,211,153,0.4));
+    border-radius: 2px;
+    z-index: 0;
+  }
+
+  /* ===== EVENT ROW ===== */
+  .hist-event-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 6px;
+    transition: all 0.2s;
+    position: relative;
+    z-index: 1;
+  }
+  .hist-event-row:hover {
+    background: var(--glass-bg-hover, rgba(255,255,255,0.05));
+    border-color: var(--glass-border-hover, rgba(255,255,255,0.15));
+    transform: translateX(2px);
+  }
+  .hist-event-row.ev-pending {
+    border-color: rgba(251,191,36,0.3);
+    background: rgba(251,191,36,0.04);
+  }
+  .hist-event-row.ev-cleared {
+    border-color: rgba(52,211,153,0.25);
+    background: rgba(52,211,153,0.04);
+  }
+
+  /* ===== EVENT ICON CIRCLE ===== */
+  .hist-ev-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    border: 2px solid transparent;
+    position: relative;
+    z-index: 2;
+  }
+  .hist-ev-icon.pending-icon {
+    background: rgba(107,114,128,0.15);
+    border-color: rgba(107,114,128,0.35);
+    color: #6b7280;
+  }
+  .hist-ev-icon.cleared-icon {
+    background: rgba(52,211,153,0.12);
+    border-color: rgba(52,211,153,0.35);
+    color: #34d399;
+  }
+  .hist-ev-icon.sale-icon {
+    background: rgba(251,113,133,0.12);
+    border-color: rgba(251,113,133,0.3);
+    color: #fb7185;
+  }
+  .hist-ev-icon.comp-icon {
+    background: rgba(167,139,250,0.12);
+    border-color: rgba(167,139,250,0.3);
+    color: #a78bfa;
+  }
+  .hist-ev-icon.corked-icon, .hist-ev-icon.waste-icon {
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.3);
+    color: #ef4444;
+  }
+  .hist-ev-icon.waste-icon {
+    background: rgba(251,191,36,0.1);
+    border-color: rgba(251,191,36,0.3);
+    color: #fbbf24;
+  }
+
+  /* ===== EVENT CONTENT ===== */
+  .hist-ev-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .hist-ev-name {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hist-ev-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .hist-ev-notes {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* ===== BADGES ===== */
+  .hist-cat-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: 5px;
+  }
+  .hist-cat-wine {
+    background: rgba(139,92,246,0.15);
+    color: #a78bfa;
+  }
+  .hist-cat-bar {
+    background: rgba(0,212,170,0.12);
+    color: #00d4aa;
+  }
+  .hist-type-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 5px;
+    text-transform: capitalize;
+  }
+  .type-purchase { background: rgba(52,211,153,0.12); color: #34d399; }
+  .type-sale     { background: rgba(251,113,133,0.12); color: #fb7185; }
+  .type-comp     { background: rgba(167,139,250,0.12); color: #a78bfa; }
+  .type-corked   { background: rgba(239,68,68,0.1);    color: #ef4444; }
+  .type-waste    { background: rgba(251,191,36,0.12);   color: #fbbf24; }
+
+  /* ===== QUANTITY BADGE ===== */
+  .hist-qty-badge {
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    min-width: 52px;
+    text-align: center;
+    padding: 4px 10px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .qty-positive { background: rgba(52,211,153,0.12); color: #34d399; }
+  .qty-negative { background: rgba(251,113,133,0.12); color: #fb7185; }
+
+  /* ===== PRICE CHIP ===== */
+  .hist-price-chip {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 60px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ===== STATUS BADGE ===== */
+  .hist-status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .status-pending {
+    background: rgba(107,114,128,0.15);
+    color: #9ca3af;
+    border: 1px solid rgba(107,114,128,0.25);
+  }
+  .status-cleared {
+    background: rgba(52,211,153,0.12);
+    color: #34d399;
+    border: 1px solid rgba(52,211,153,0.25);
+  }
+  .status-done {
+    background: rgba(96,165,250,0.1);
+    color: #60a5fa;
+    border: 1px solid rgba(96,165,250,0.2);
+  }
+
+  /* ===== EMPTY STATE ===== */
+  .hist-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .hist-empty i { font-size: 48px; margin-bottom: 14px; display: block; opacity: 0.4; }
+  .hist-empty p { font-size: 15px; }
+
+  /* ===== LOADING SPINNER ===== */
+  .hist-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px;
+    color: var(--text-muted);
+  }
+  .hist-loading i { font-size: 28px; margin-right: 12px; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== PAGINATION ===== */
+  .hist-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+    padding: 16px 0;
+  }
+  .hist-page-btn {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .hist-page-btn:hover { border-color: var(--glass-border-hover); color: var(--text-primary); }
+  .hist-page-btn.active {
+    background: rgba(212,164,74,0.15);
+    border-color: rgba(212,164,74,0.4);
+    color: var(--accent-gold, #d4a44a);
+    font-weight: 700;
+  }
+  .hist-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ===== QUICK FILTER CHIPS ===== */
+  .hist-quick-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  .hist-qf-chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-muted);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .hist-qf-chip:hover, .hist-qf-chip.active {
+    background: rgba(212,164,74,0.15);
+    border-color: rgba(212,164,74,0.4);
+    color: var(--accent-gold, #d4a44a);
+  }
+  .hist-qf-chip.active-wine { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.4); color: #a78bfa; }
+  .hist-qf-chip.active-bar  { background: rgba(0,212,170,0.12); border-color: rgba(0,212,170,0.35); color: #00d4aa; }
+
+  /* ===== BACK BUTTON ===== */
+  .btn-hist-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: var(--text-secondary);
+    border-radius: 9px;
+    padding: 8px 16px;
+    font-size: 13px;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .btn-hist-back:hover { color: var(--text-primary); border-color: var(--glass-border-hover); }
+
+  @media (max-width: 600px) {
+    .hist-filter-bar { flex-direction: column; }
+    .hist-ev-name { font-size: 13px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- PAGE HEADER -->
+<div class="hist-page-header animate-in">
+  <div>
+    <h1 class="hist-page-title"><i class="fas fa-history" style="color:var(--accent-gold,#d4a44a);margin-right:10px;"></i>Stock History</h1>
+    <p class="hist-page-subtitle">Full audit log of all wine &amp; bar stock changes</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <a href="{{ url_for('wine_stock') }}" class="btn-hist-back">
+      <i class="fas fa-wine-glass-alt"></i> Wine Stock
+    </a>
+    <a href="{{ url_for('bar_stock') }}" class="btn-hist-back">
+      <i class="fas fa-cocktail"></i> Bar Stock
+    </a>
+  </div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="hist-filter-bar animate-in">
+  <div class="hist-filter-group">
+    <label class="hist-filter-label"><i class="fas fa-calendar"></i> From Date</label>
+    <input type="date" class="hist-filter-input" id="filterFrom" style="min-width:140px;">
+  </div>
+  <div class="hist-filter-group">
+    <label class="hist-filter-label"><i class="fas fa-calendar"></i> To Date</label>
+    <input type="date" class="hist-filter-input" id="filterTo" style="min-width:140px;" value="{{ today }}">
+  </div>
+  <div class="hist-filter-group">
+    <label class="hist-filter-label"><i class="fas fa-layer-group"></i> Category</label>
+    <select class="hist-filter-select" id="filterCategory" style="min-width:110px;">
+      <option value="all">All</option>
+      <option value="wine">🍷 Wine</option>
+      <option value="bar">🍹 Bar</option>
+    </select>
+  </div>
+  <div class="hist-filter-group">
+    <label class="hist-filter-label"><i class="fas fa-tag"></i> Event Type</label>
+    <select class="hist-filter-select" id="filterEventType" style="min-width:130px;">
+      <option value="all">All Events</option>
+      <option value="purchase">Purchases</option>
+      <option value="sale">Sales</option>
+      <option value="comp">Comps</option>
+      <option value="corked">Corked</option>
+      <option value="waste">Waste</option>
+    </select>
+  </div>
+  <div class="hist-filter-group">
+    <label class="hist-filter-label"><i class="fas fa-search"></i> Search Name</label>
+    <input type="text" class="hist-filter-input" id="filterSearch" placeholder="e.g. Albarino…" style="min-width:150px;">
+  </div>
+  <div class="hist-filter-actions">
+    <button class="btn-hist-apply" onclick="applyFilters()" id="btnApplyFilters">
+      <i class="fas fa-filter"></i> Apply
+    </button>
+    <button class="btn-hist-reset" onclick="resetFilters()" id="btnResetFilters">
+      <i class="fas fa-times"></i> Reset
+    </button>
+  </div>
+</div>
+
+<!-- QUICK FILTER CHIPS -->
+<div class="hist-quick-filters" id="quickFilters">
+  <span style="font-size:11px;color:var(--text-muted);font-weight:600;">Quick:</span>
+  <button class="hist-qf-chip" onclick="setQuickFilter('today')" id="qfToday">Today</button>
+  <button class="hist-qf-chip" onclick="setQuickFilter('week')" id="qfWeek">This Week</button>
+  <button class="hist-qf-chip" onclick="setQuickFilter('month')" id="qfMonth">This Month</button>
+  <button class="hist-qf-chip" onclick="setQuickFilter('30days')" id="qf30">Last 30 Days</button>
+  <button class="hist-qf-chip" onclick="setQuickFilter('90days')" id="qf90">Last 90 Days</button>
+  <button class="hist-qf-chip" onclick="setQuickFilter('all')" id="qfAll">All Time</button>
+</div>
+
+<!-- SUMMARY PILLS -->
+<div class="hist-summary-row" id="summaryRow" style="display:none;">
+  <div class="hist-summary-pill">
+    <i class="fas fa-list"></i> Total Events
+    <span class="pill-count" id="pillTotal">0</span>
+  </div>
+  <div class="hist-summary-pill">
+    <i class="fas fa-clock" style="color:#9ca3af;"></i> Pending
+    <span class="pill-count" id="pillPending" style="background:rgba(107,114,128,0.15);color:#9ca3af;">0</span>
+  </div>
+  <div class="hist-summary-pill">
+    <i class="fas fa-check-circle" style="color:#34d399;"></i> Cleared
+    <span class="pill-count" id="pillCleared" style="background:rgba(52,211,153,0.12);color:#34d399;">0</span>
+  </div>
+  <div class="hist-summary-pill">
+    <i class="fas fa-plus-circle" style="color:#34d399;"></i> Purchases
+    <span class="pill-count" id="pillPurchases" style="background:rgba(52,211,153,0.12);color:#34d399;">0</span>
+  </div>
+  <div class="hist-summary-pill">
+    <i class="fas fa-minus-circle" style="color:#fb7185;"></i> Sales
+    <span class="pill-count" id="pillSales" style="background:rgba(251,113,133,0.12);color:#fb7185;">0</span>
+  </div>
+</div>
+
+<!-- TIMELINE -->
+<div id="histTimeline">
+  <div class="hist-loading" id="histLoading">
+    <i class="fas fa-spinner"></i>
+    <span>Loading history…</span>
+  </div>
+</div>
+
+<!-- PAGINATION -->
+<div class="hist-pagination" id="histPagination" style="display:none;"></div>
+
+<script>
+const TODAY_STR = '{{ today }}';
+let currentPage = 1;
+let currentFilters = { from_date: '', to_date: TODAY_STR, category: 'all', event_type: 'all', search: '' };
+let totalPages = 1;
+let allEvents = [];
+
+function getMonday(d) {
+  const dt = new Date(d);
+  const day = dt.getDay() || 7;
+  if (day !== 1) dt.setHours(-24 * (day - 1));
+  return dt.toISOString().split('T')[0];
+}
+function addDays(dateStr, n) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+function startOfMonth(dateStr) {
+  return dateStr.substring(0, 7) + '-01';
+}
+
+function setQuickFilter(type) {
+  const today = TODAY_STR;
+  document.querySelectorAll('.hist-qf-chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('filterTo').value = today;
+  if (type === 'today') {
+    document.getElementById('filterFrom').value = today;
+    document.getElementById('qfToday').classList.add('active');
+  } else if (type === 'week') {
+    document.getElementById('filterFrom').value = getMonday(today);
+    document.getElementById('qfWeek').classList.add('active');
+  } else if (type === 'month') {
+    document.getElementById('filterFrom').value = startOfMonth(today);
+    document.getElementById('qfMonth').classList.add('active');
+  } else if (type === '30days') {
+    document.getElementById('filterFrom').value = addDays(today, -30);
+    document.getElementById('qf30').classList.add('active');
+  } else if (type === '90days') {
+    document.getElementById('filterFrom').value = addDays(today, -90);
+    document.getElementById('qf90').classList.add('active');
+  } else {
+    document.getElementById('filterFrom').value = '';
+    document.getElementById('filterTo').value = '';
+    document.getElementById('qfAll').classList.add('active');
+  }
+  applyFilters();
+}
+
+function applyFilters() {
+  currentPage = 1;
+  currentFilters = {
+    from_date: document.getElementById('filterFrom').value,
+    to_date: document.getElementById('filterTo').value,
+    category: document.getElementById('filterCategory').value,
+    event_type: document.getElementById('filterEventType').value,
+    search: document.getElementById('filterSearch').value.toLowerCase().trim(),
+  };
+  loadHistory();
+}
+
+function resetFilters() {
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value = TODAY_STR;
+  document.getElementById('filterCategory').value = 'all';
+  document.getElementById('filterEventType').value = 'all';
+  document.getElementById('filterSearch').value = '';
+  document.querySelectorAll('.hist-qf-chip').forEach(c => c.classList.remove('active'));
+  currentPage = 1;
+  applyFilters();
+}
+
+async function loadHistory() {
+  const tl = document.getElementById('histTimeline');
+  const pg = document.getElementById('histPagination');
+  tl.innerHTML = '<div class="hist-loading"><i class="fas fa-spinner"></i><span>Loading history…</span></div>';
+  pg.style.display = 'none';
+  document.getElementById('summaryRow').style.display = 'none';
+
+  const params = new URLSearchParams({ page: currentPage, per_page: 200 });
+  if (currentFilters.from_date) params.append('from_date', currentFilters.from_date);
+  if (currentFilters.to_date) params.append('to_date', currentFilters.to_date);
+  if (currentFilters.category !== 'all') params.append('category', currentFilters.category);
+  if (currentFilters.event_type !== 'all') params.append('event_type', currentFilters.event_type);
+
+  try {
+    const resp = await fetch('/api/stock-history?' + params.toString());
+    const data = await resp.json();
+    allEvents = data.events || [];
+    totalPages = data.pages || 1;
+
+    // Client-side search filter
+    let filtered = allEvents;
+    if (currentFilters.search) {
+      filtered = allEvents.filter(e => e.name.toLowerCase().includes(currentFilters.search));
+    }
+
+    renderSummary(filtered);
+    renderTimeline(filtered);
+    renderPagination(data.page, data.pages);
+  } catch (err) {
+    tl.innerHTML = '<div class="hist-empty"><i class="fas fa-exclamation-triangle"></i><p>Failed to load history. Please try again.</p></div>';
+  }
+}
+
+function renderSummary(events) {
+  const row = document.getElementById('summaryRow');
+  row.style.display = 'flex';
+  document.getElementById('pillTotal').textContent = events.length;
+  document.getElementById('pillPending').textContent = events.filter(e => e.status === 'pending').length;
+  document.getElementById('pillCleared').textContent = events.filter(e => e.status === 'cleared').length;
+  document.getElementById('pillPurchases').textContent = events.filter(e => e.type === 'purchase').length;
+  document.getElementById('pillSales').textContent = events.filter(e => e.type === 'sale').length;
+}
+
+function renderTimeline(events) {
+  const tl = document.getElementById('histTimeline');
+  if (!events.length) {
+    tl.innerHTML = '<div class="hist-empty"><i class="fas fa-clock-rotate-left"></i><p>No events found for the selected filters.</p></div>';
+    return;
+  }
+
+  // Group by date
+  const byDate = {};
+  events.forEach(e => {
+    if (!byDate[e.date]) byDate[e.date] = [];
+    byDate[e.date].push(e);
+  });
+
+  // Group purchases by order_group_id for the connector UI
+  const purchaseGroups = {};
+  events.forEach(e => {
+    if (e.type === 'purchase' && e.order_group_id) {
+      if (!purchaseGroups[e.order_group_id]) purchaseGroups[e.order_group_id] = [];
+      purchaseGroups[e.order_group_id].push(e);
+    }
+  });
+
+  let html = '';
+  const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+  sortedDates.forEach(dateStr => {
+    const dayEvents = byDate[dateStr];
+    const dateFmt = formatDate(dateStr);
+    html += `<div class="hist-date-group"><div class="hist-date-label"><i class="fas fa-calendar-day"></i>${dateFmt} <span style="color:var(--text-muted);font-size:10px;">(${dayEvents.length} events)</span></div>`;
+
+    // Render events — purchases get special connector treatment
+    const rendered = new Set();
+    dayEvents.forEach(ev => {
+      if (rendered.has(ev.id)) return;
+      rendered.add(ev.id);
+      html += renderEventRow(ev);
+    });
+    html += '</div>';
+  });
+
+  tl.innerHTML = html;
+}
+
+function renderEventRow(ev) {
+  const isPos = ev.quantity_raw > 0;
+  const qtyClass = isPos ? 'qty-positive' : 'qty-negative';
+  const catClass = ev.category === 'wine' ? 'hist-cat-wine' : 'hist-cat-bar';
+  const catLabel = ev.category === 'wine' ? '🍷 Wine' : '🍹 Bar';
+
+  let iconClass, rowClass;
+  if (ev.type === 'purchase') {
+    if (ev.status === 'pending') {
+      iconClass = 'pending-icon';
+      rowClass = 'ev-pending';
+    } else {
+      iconClass = 'cleared-icon';
+      rowClass = 'ev-cleared';
+    }
+  } else if (ev.type === 'sale') {
+    iconClass = 'sale-icon'; rowClass = '';
+  } else if (ev.type === 'comp') {
+    iconClass = 'comp-icon'; rowClass = '';
+  } else if (ev.type === 'corked') {
+    iconClass = 'corked-icon'; rowClass = '';
+  } else if (ev.type === 'waste') {
+    iconClass = 'waste-icon'; rowClass = '';
+  } else {
+    iconClass = ''; rowClass = '';
+  }
+
+  const icon = ev.type === 'purchase'
+    ? (ev.status === 'pending' ? 'fa-clock' : 'fa-check-circle')
+    : ev.icon;
+
+  let statusBadge = '';
+  if (ev.type === 'purchase') {
+    if (ev.status === 'pending') {
+      statusBadge = `<span class="hist-status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>`;
+    } else {
+      const cleared = ev.date_cleared ? ` · ${formatDatetime(ev.date_cleared)}` : '';
+      statusBadge = `<span class="hist-status-badge status-cleared"><i class="fas fa-check"></i> Cleared${cleared}</span>`;
+    }
+  } else if (ev.status === 'done') {
+    statusBadge = `<span class="hist-status-badge status-done"><i class="fas fa-check-double"></i> Done</span>`;
+  }
+
+  return `
+  <div class="hist-event-row ${rowClass}" id="ev-${ev.id}">
+    <div class="hist-ev-icon ${iconClass}">
+      <i class="fas ${icon}"></i>
+    </div>
+    <div class="hist-ev-content">
+      <div class="hist-ev-name">${escHtml(ev.name)}</div>
+      <div class="hist-ev-meta">
+        <span class="hist-cat-badge ${catClass}">${catLabel}</span>
+        <span class="hist-type-badge type-${ev.type}">${ev.type}</span>
+        <span class="hist-ev-notes">${escHtml(ev.notes)}</span>
+        ${ev.unit ? `<span style="color:var(--text-muted);font-size:10px;">· ${escHtml(ev.unit)}</span>` : ''}
+        ${statusBadge}
+      </div>
+    </div>
+    <div class="hist-qty-badge ${qtyClass}">${escHtml(ev.quantity)}</div>
+    <div class="hist-price-chip">${escHtml(ev.price)}</div>
+  </div>`;
+}
+
+function renderPagination(page, pages) {
+  const pg = document.getElementById('histPagination');
+  if (pages <= 1) { pg.style.display = 'none'; return; }
+  pg.style.display = 'flex';
+  let html = `<button class="hist-page-btn" onclick="gotoPage(${page-1})" ${page<=1?'disabled':''}>‹ Prev</button>`;
+  const start = Math.max(1, page - 2), end = Math.min(pages, page + 2);
+  if (start > 1) html += `<button class="hist-page-btn" onclick="gotoPage(1)">1</button>${start > 2 ? '<span style="color:var(--text-muted)">…</span>' : ''}`;
+  for (let i = start; i <= end; i++) {
+    html += `<button class="hist-page-btn ${i===page?'active':''}" onclick="gotoPage(${i})">${i}</button>`;
+  }
+  if (end < pages) html += `${end < pages-1 ? '<span style="color:var(--text-muted)">…</span>' : ''}<button class="hist-page-btn" onclick="gotoPage(${pages})">${pages}</button>`;
+  html += `<button class="hist-page-btn" onclick="gotoPage(${page+1})" ${page>=pages?'disabled':''}>Next ›</button>`;
+  pg.innerHTML = html;
+}
+
+function gotoPage(p) {
+  currentPage = p;
+  loadHistory();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function formatDate(str) {
+  const d = new Date(str + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+}
+function formatDatetime(str) {
+  const d = new Date(str);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Initialise on load — default to last 30 days
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('filterFrom').value = addDays(TODAY_STR, -30);
+  document.getElementById('qf30').classList.add('active');
+  applyFilters();
+});
+</script>
+{% endblock %}

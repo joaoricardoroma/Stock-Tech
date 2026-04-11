@@ -1,0 +1,419 @@
+{% extends 'base.html' %}
+
+{% block title %}Wine Stock Check — StockTech{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wine_stock.css') }}">
+<style>
+  .check-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 28px 16px;
+    background: var(--surface-glass);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 24px;
+    backdrop-filter: blur(12px);
+  }
+  .check-page-title { font-size: 1.6rem; font-weight: 700; color: var(--text-primary); }
+  .check-page-subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+  .check-header-actions { display: flex; gap: 12px; align-items: center; }
+
+  .check-table-wrapper {
+    background: var(--surface-glass);
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+  }
+  .check-table { width: 100%; border-collapse: collapse; }
+  .check-table thead tr {
+    background: linear-gradient(135deg, rgba(30,30,50,0.9), rgba(20,20,40,0.9));
+    border-bottom: 1px solid var(--border-color);
+  }
+  .check-table th {
+    padding: 14px 16px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent-gold);
+    text-align: left;
+  }
+  .check-table th.th-center { text-align: center; }
+  .check-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.2s;
+  }
+  .check-table tbody tr:hover { background: rgba(255,255,255,0.04); }
+  .check-table tbody tr:last-child { border-bottom: none; }
+  .check-table td { padding: 11px 16px; font-size: 0.88rem; color: var(--text-secondary); }
+  .check-table td.td-name { font-weight: 600; color: var(--text-primary); font-size: 0.9rem; }
+  .check-table td.td-virtual {
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    letter-spacing: 0.04em;
+  }
+  .check-table td.td-real { text-align: center; }
+
+  .real-input {
+    width: 90px;
+    padding: 7px 12px;
+    background: rgba(255,255,255,0.07);
+    border: 1.5px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s;
+    outline: none;
+  }
+  .real-input:focus {
+    border-color: var(--accent-gold);
+    background: rgba(212,164,74,0.08);
+  }
+  .real-input.has-value {
+    border-color: var(--accent-green);
+    background: rgba(46,204,113,0.06);
+  }
+
+  .btn-confirm-check {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--accent-green), #27ae60);
+    border: none; border-radius: 12px;
+    color: #fff; font-weight: 700; font-size: 0.9rem;
+    cursor: pointer; transition: all 0.25s; white-space: nowrap;
+  }
+  .btn-confirm-check:hover { transform: translateY(-2px); filter: brightness(1.15); box-shadow: 0 6px 24px rgba(46,204,113,0.3); }
+  .btn-confirm-check:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  .btn-back { display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+    background: var(--surface-glass); border: 1px solid var(--border-color);
+    border-radius: 12px; color: var(--text-secondary); font-weight: 600;
+    text-decoration: none; font-size: 0.88rem; transition: all 0.2s; }
+  .btn-back:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+
+  .check-legend {
+    display: flex; gap: 20px; align-items: center;
+    font-size: 0.8rem; color: var(--text-muted); padding: 12px 28px;
+    background: rgba(255,255,255,0.02); border-top: 1px solid var(--border-color);
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+  /* Discrepancy overlay */
+  .disc-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .disc-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 32px;
+    max-width: 560px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .disc-card h2 { font-size: 1.3rem; margin-bottom: 6px; }
+  .disc-none { text-align: center; padding: 24px 0; }
+  .disc-none i { font-size: 48px; color: var(--accent-green); margin-bottom: 12px; display: block; }
+  .disc-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; margin-top: 16px; }
+  .disc-table th { color: var(--accent-gold); padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border-color); }
+  .disc-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .diff-neg { color: var(--accent-red); font-weight: 700; }
+  .diff-pos { color: var(--accent-green); font-weight: 700; }
+  .disc-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="check-page-header animate-in">
+  <div>
+    <div class="check-page-title"><i class="fas fa-clipboard-check" style="color:var(--accent-green);margin-right:10px;"></i>Wine Stock Check</div>
+    <div class="check-page-subtitle">Compare virtual DB stock vs. real physical count. Leave blank to keep as-is.</div>
+  </div>
+  <div class="check-header-actions">
+    <span id="progressLabel" style="font-size:0.82rem;color:var(--text-muted);"></span>
+    <a href="{{ url_for('wine_stock') }}" class="btn-back"><i class="fas fa-arrow-left"></i> Back to Wine Stock</a>
+    <button class="btn-confirm-check" onclick="submitStockCheck()" id="btnConfirm">
+      <i class="fas fa-check-double"></i> Confirm Stock Check
+    </button>
+  </div>
+</div>
+
+<div class="check-table-wrapper animate-in">
+  <table class="check-table" id="checkTable">
+    <thead>
+      <tr>
+        <th>Wine Name</th>
+        <th class="th-center">Virtual (DB)</th>
+        <th class="th-center">Real Stock</th>
+        <th class="th-center">Diff</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for wine in wines %}
+      <tr id="checkRow{{ wine.id }}" data-wine-id="{{ wine.id }}" data-virtual="{{ wine.current_stock_qty | round(2) }}">
+        <td class="td-name">
+          <span class="wine-dot {% if wine.current_stock_qty < wine.minimum_stock_threshold %}dot-red{% elif wine.current_stock_qty <= wine.minimum_stock_threshold + 2 %}dot-amber{% else %}dot-green{% endif %}"></span>
+          {{ wine.name }}
+        </td>
+        <td class="td-virtual">{{ wine.stock_display }}</td>
+        <td class="td-real">
+          <input type="number"
+                 class="real-input"
+                 id="realInput{{ wine.id }}"
+                 min="0" step="0.5"
+                 placeholder="{{ wine.stock_display }}"
+                 oninput="onRealInput(this, {{ wine.id }}, {{ wine.current_stock_qty | round(4) }})"
+                 data-wine-id="{{ wine.id }}">
+        </td>
+        <td class="td-virtual" id="diffCell{{ wine.id }}" style="color:var(--text-muted);">—</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="check-legend">
+    <span><span class="legend-dot" style="background:var(--accent-green);"></span>In Stock</span>
+    <span><span class="legend-dot" style="background:var(--accent-amber);"></span>Low</span>
+    <span><span class="legend-dot" style="background:var(--accent-red);"></span>Critical</span>
+    <span style="margin-left:auto;">Leave Real Stock blank to keep DB value unchanged.</span>
+  </div>
+</div>
+
+<!-- Discrepancy overlay (hidden initially) -->
+<div class="disc-overlay" id="discOverlay" style="display:none;">
+  <div class="disc-card">
+    <h2 id="discTitle" style="color:var(--text-primary);"></h2>
+    <p id="discSubtitle" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;"></p>
+    <div id="discBody"></div>
+    <div class="disc-footer">
+      <button class="btn-back" style="cursor:pointer;border:1px solid var(--border-color);" onclick="goBack()">
+        <i class="fas fa-arrow-left"></i> Back to Stock
+      </button>
+      <button id="btnDiscPDF" class="btn-confirm-check" style="background:linear-gradient(135deg,#e74c3c,#c0392b);" onclick="downloadDiscPDF()">
+        <i class="fas fa-file-pdf"></i> Download Report
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let checkResultData = null;
+let checkDate = '{{ today }}';
+
+function onRealInput(input, wineId, virtualQty) {
+  input.classList.toggle('has-value', input.value !== '');
+  const diffCell = document.getElementById(`diffCell${wineId}`);
+  if (input.value === '') {
+    diffCell.textContent = '—';
+    diffCell.style.color = 'var(--text-muted)';
+    return;
+  }
+  const real = parseFloat(input.value);
+  const diff = Math.round((real - virtualQty) * 100) / 100;
+  if (Math.abs(diff) < 0.001) {
+    diffCell.textContent = '0';
+    diffCell.style.color = 'var(--text-muted)';
+  } else if (diff > 0) {
+    diffCell.textContent = `+${diff}`;
+    diffCell.style.color = 'var(--accent-green)';
+  } else {
+    diffCell.textContent = `${diff}`;
+    diffCell.style.color = 'var(--accent-red)';
+  }
+
+  // Update progress
+  const filled = document.querySelectorAll('.real-input.has-value').length;
+  const total = document.querySelectorAll('.real-input').length;
+  document.getElementById('progressLabel').textContent = `${filled} / ${total} wines checked`;
+}
+
+async function submitStockCheck() {
+  const btn = document.getElementById('btnConfirm');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+  const rows = document.querySelectorAll('#checkTable tbody tr');
+  const items = [];
+  rows.forEach(row => {
+    const wineId = parseInt(row.dataset.wineId);
+    const input = row.querySelector('.real-input');
+    if (input && input.value !== '') {
+      items.push({ wine_id: wineId, real_qty: parseFloat(input.value) });
+    }
+  });
+
+  if (items.length === 0) {
+    showToast('No values entered. Fill in at least one Real Stock field.', 'warning');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check-double"></i> Confirm Stock Check';
+    return;
+  }
+
+  try {
+    const resp = await fetch('/api/wine/stock-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items })
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Failed');
+
+    checkResultData = data.discrepancies;
+    showDiscrepancyOverlay(data.discrepancies, items.length);
+  } catch (err) {
+    showToast('Error: ' + err.message, 'danger');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check-double"></i> Confirm Stock Check';
+  }
+}
+
+function showDiscrepancyOverlay(discrepancies, totalChecked) {
+  const overlay = document.getElementById('discOverlay');
+  const title = document.getElementById('discTitle');
+  const subtitle = document.getElementById('discSubtitle');
+  const body = document.getElementById('discBody');
+  const pdfBtn = document.getElementById('btnDiscPDF');
+
+  if (!discrepancies || discrepancies.length === 0) {
+    title.innerHTML = '<i class="fas fa-check-circle" style="color:var(--accent-green);margin-right:8px;"></i>No Discrepancies!';
+    subtitle.textContent = `${totalChecked} wines checked — all match the database.`;
+    body.innerHTML = '<div class="disc-none"><i class="fas fa-check-circle"></i><p style="font-size:1rem;font-weight:600;color:var(--text-primary)">Perfect match!</p><p style="color:var(--text-muted);">Database has been updated with your counts.</p></div>';
+    pdfBtn.style.display = 'none';
+  } else {
+    title.innerHTML = `<i class="fas fa-exclamation-triangle" style="color:var(--accent-amber);margin-right:8px;"></i>${discrepancies.length} Discrepanc${discrepancies.length > 1 ? 'ies' : 'y'} Found`;
+    subtitle.textContent = `Database updated. ${discrepancies.length} wine(s) had differences.`;
+    pdfBtn.style.display = 'flex';
+    body.innerHTML = `
+      <table class="disc-table">
+        <thead><tr><th>Wine</th><th>Virtual</th><th>Real</th><th>Diff</th></tr></thead>
+        <tbody>
+          ${discrepancies.map(d => `
+            <tr>
+              <td>${d.wine_name}</td>
+              <td>${d.virtual_qty}</td>
+              <td><strong>${d.real_qty}</strong></td>
+              <td class="${d.difference > 0 ? 'diff-pos' : 'diff-neg'}">${d.difference > 0 ? '+' : ''}${d.difference}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  overlay.style.display = 'flex';
+}
+
+function goBack() {
+  window.location.href = '{{ url_for("wine_stock") }}';
+}
+
+function downloadDiscPDF() {
+  if (!checkResultData || checkResultData.length === 0) return;
+  const btn = document.getElementById('btnDiscPDF');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const today = new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+    // Header
+    doc.setFillColor(7, 7, 13);
+    doc.rect(0, 0, pageW, 28, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(212, 164, 74);
+    doc.text('StockTech', 14, 12);
+    doc.setFontSize(11);
+    doc.setTextColor(200, 200, 200);
+    doc.text('Wine Stock Check — Discrepancy Report', 14, 21);
+    doc.setFontSize(9);
+    doc.setTextColor(140, 140, 140);
+    doc.text(`Generated: ${today}`, pageW - 14, 21, { align: 'right' });
+
+    let y = 38;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(231, 76, 60);
+    doc.text(`${checkResultData.length} Discrepanc${checkResultData.length > 1 ? 'ies' : 'y'} Found`, 14, y);
+    y += 10;
+
+    // Table header
+    doc.setFillColor(30, 30, 50);
+    doc.rect(14, y, pageW - 28, 8, 'F');
+    doc.setFontSize(9);
+    doc.setTextColor(212, 164, 74);
+    doc.text('Wine Name', 16, y + 5.5);
+    doc.text('Virtual (DB)', 110, y + 5.5);
+    doc.text('Real Stock', 142, y + 5.5);
+    doc.text('Difference', 172, y + 5.5);
+    y += 8;
+
+    checkResultData.forEach((d, idx) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.setFillColor(idx % 2 === 0 ? 20 : 28, idx % 2 === 0 ? 20 : 28, idx % 2 === 0 ? 35 : 45);
+      doc.rect(14, y, pageW - 28, 8, 'F');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(220, 220, 220);
+      const name = d.wine_name.length > 45 ? d.wine_name.substring(0, 43) + '...' : d.wine_name;
+      doc.text(name, 16, y + 5);
+      doc.setTextColor(91, 141, 239);
+      doc.text(String(d.virtual_qty), 112, y + 5);
+      doc.setTextColor(46, 204, 113);
+      doc.text(String(d.real_qty), 144, y + 5);
+      doc.setTextColor(d.difference < 0 ? 231 : 46, d.difference < 0 ? 76 : 204, d.difference < 0 ? 60 : 113);
+      doc.text((d.difference > 0 ? '+' : '') + d.difference, 174, y + 5);
+      y += 8;
+    });
+
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Database has been updated with the real stock counts.', 14, y);
+    doc.text('StockTech — Confidential', pageW - 14, 280, { align: 'right' });
+
+    doc.save(`wine_stock_check_${checkDate}.pdf`);
+    showToast('PDF downloaded!', 'success');
+  } catch (err) {
+    showToast('PDF generation failed.', 'danger');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-file-pdf"></i> Download Report';
+  }
+}
+
+function showToast(msg, type) {
+  const colors = { success: '#2ecc71', danger: '#e74c3c', warning: '#f39c12' };
+  let cont = document.getElementById('toastContainer');
+  if (!cont) {
+    cont = document.createElement('div');
+    cont.id = 'toastContainer';
+    cont.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:10px;';
+    document.body.appendChild(cont);
+  }
+  const t = document.createElement('div');
+  t.style.cssText = `background:rgba(20,20,35,0.95);border-left:4px solid ${colors[type]||colors.info};color:#e0e0e0;padding:14px 20px;border-radius:10px;font-size:14px;font-weight:500;max-width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.4);backdrop-filter:blur(10px);`;
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'all 0.3s'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+</script>
+{% endblock %}
