@@ -28,6 +28,7 @@ from flask_login import (
     login_required, current_user
 )
 from flask_caching import Cache
+from flask_compress import Compress
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -52,6 +53,9 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
+    'pool_size': 5,          # keep 5 connections warm to Neon
+    'max_overflow': 10,      # allow burst up to 15 total
+    'connect_args': {'connect_timeout': 10},
 }
 
 # Invoice image upload config
@@ -59,9 +63,11 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'in
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp', 'heic'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600  # 1-hour browser cache for static assets
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 db.init_app(app)
+Compress(app)  # gzip all responses automatically (saves ~70% bandwidth on JSON & HTML)
 
 # ---------------------------------------------------------------------------
 # Cache — SimpleCache (in-process, single worker)
@@ -1053,7 +1059,10 @@ def api_stock_history():
 
     # ---- BAR WASTE ----
     if category in ('all', 'bar') and event_type in ('all', 'waste'):
-        q = BarWaste.query
+        q = BarWaste.query.options(
+            joinedload(BarWaste.spirit),
+            joinedload(BarWaste.sub_ingredient),
+        )
         if from_date:
             q = q.filter(BarWaste.date >= from_date)
         if to_date:
@@ -1192,8 +1201,12 @@ def submit_wine_stock_check():
     items = data.get('items', [])
     discrepancies = []
 
+    # Bulk-load all wines referenced in a single query (eliminates N+1)
+    wine_ids = [item['wine_id'] for item in items if item.get('wine_id')]
+    wines_map = {w.id: w for w in Wine.query.filter(Wine.id.in_(wine_ids)).all()} if wine_ids else {}
+
     for item in items:
-        wine = Wine.query.get(item['wine_id'])
+        wine = wines_map.get(item['wine_id'])
         if not wine:
             continue
         real_qty = float(item['real_qty'])
@@ -1238,8 +1251,15 @@ def submit_bar_stock_check():
     data = request.get_json()
     discrepancies = []
 
+    # Bulk-load all spirits and sub-ingredients referenced (eliminates N+1)
+    spirit_ids = [i['spirit_id'] for i in data.get('spirits', []) if i.get('spirit_id')]
+    spirits_map = {s.id: s for s in Spirit.query.filter(Spirit.id.in_(spirit_ids)).all()} if spirit_ids else {}
+
+    sub_ids = [i['sub_ingredient_id'] for i in data.get('sub_ingredients', []) if i.get('sub_ingredient_id')]
+    subs_map = {s.id: s for s in SubIngredient.query.filter(SubIngredient.id.in_(sub_ids)).all()} if sub_ids else {}
+
     for item in data.get('spirits', []):
-        spirit = Spirit.query.get(item['spirit_id'])
+        spirit = spirits_map.get(item['spirit_id'])
         if not spirit:
             continue
         real_bottles = float(item['real_bottles'])
@@ -1258,7 +1278,7 @@ def submit_bar_stock_check():
         spirit.current_measures = round(real_bottles * spirit.measures_per_bottle, 4)
 
     for item in data.get('sub_ingredients', []):
-        sub = SubIngredient.query.get(item['sub_ingredient_id'])
+        sub = subs_map.get(item['sub_ingredient_id'])
         if not sub:
             continue
         real_stock = float(item['real_stock'])
@@ -1852,17 +1872,29 @@ def init_db():
     with app.app_context():
         db.create_all()
 
-        # Create admin user
-        if not User.query.filter_by(username='Admin').first():
+        # Create Pearl user (primary account)
+        existing = User.query.filter_by(username='Pearl').first()
+        old_admin = User.query.filter_by(username='Admin').first()
+
+        if existing:
+            # Update password if Pearl already exists
+            existing.password_hash = generate_password_hash('Pearl2000')
+            db.session.commit()
+            print("✓ Pearl user updated (Pearl / Pearl2000)")
+        elif old_admin:
+            # Migrate old Admin account to Pearl
+            old_admin.username = 'Pearl'
+            old_admin.password_hash = generate_password_hash('Pearl2000')
+            db.session.commit()
+            print("✓ Admin user migrated → Pearl (Pearl / Pearl2000)")
+        else:
             admin = User(
-                username='Admin',
-                password_hash=generate_password_hash('123')
+                username='Pearl',
+                password_hash=generate_password_hash('Pearl2000')
             )
             db.session.add(admin)
             db.session.commit()
-            print("✓ Admin user created (Admin / 123)")
-        else:
-            print("✓ Admin user already exists")
+            print("✓ Pearl user created (Pearl / Pearl2000)")
 
 
 if __name__ == '__main__':
