@@ -1895,6 +1895,29 @@ def init_db():
     with app.app_context():
         db.create_all()
 
+        # Auto-migrate missing columns for Vercel/Neon DB that db.create_all() misses on existing tables
+        try:
+            from sqlalchemy import text, inspect
+            inspector = inspect(db.engine)
+            with db.engine.connect() as conn:
+                # Add pairing_group_id to wine_sales if missing (Fixes 500 Error on Vercel)
+                if 'wine_sales' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('wine_sales')]
+                    if 'pairing_group_id' not in cols:
+                        conn.execute(text('ALTER TABLE wine_sales ADD COLUMN pairing_group_id VARCHAR(36)'))
+                
+                # Add invoice image columns to wine_purchases if missing
+                if 'wine_purchases' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('wine_purchases')]
+                    if 'invoice_image_path' not in cols:
+                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_path VARCHAR(500)'))
+                    if 'invoice_image_original' not in cols:
+                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_original VARCHAR(300)'))
+                conn.commit()
+        except Exception as e:
+            import logging
+            logging.error(f"Auto-migration failed: {e}")
+
         # Create Pearl user (primary account)
         existing = User.query.filter_by(username='Pearl').first()
         old_admin = User.query.filter_by(username='Admin').first()
