@@ -54,16 +54,31 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-_engine_options = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
-# pool_size / max_overflow only supported for non-SQLite engines
-if not _db_url.startswith('sqlite'):
-    _engine_options['pool_size'] = 5
-    _engine_options['max_overflow'] = 10
-    _engine_options['connect_args'] = {'connect_timeout': 10}  # PostgreSQL only
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _engine_options
+_is_sqlite = _db_url.startswith('sqlite')
+_is_serverless = os.environ.get('VERCEL') == '1'  # Vercel sets VERCEL=1
+
+if _is_serverless:
+    # NullPool: no persistent connections in serverless — each request connects & disconnects.
+    # This prevents exhausting Neon's ~20 connection free-tier limit across Lambda invocations.
+    from sqlalchemy.pool import NullPool
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'poolclass': NullPool,
+        'pool_pre_ping': True,
+    }
+elif _is_sqlite:
+    # SQLite: minimal options, no pool tuning needed
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
+else:
+    # Traditional server (local gunicorn, etc): keep a small pool
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': 3,
+        'max_overflow': 5,
+    }
 
 # Invoice image upload config
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'invoices')
@@ -1905,6 +1920,14 @@ def init_db():
             print("✓ Pearl user created (Pearl / Pearl2000)")
 
 
-if __name__ == '__main__':
+# ---------------------------------------------------------------------------
+# Run DB init on every cold start (covers both local & Vercel serverless)
+# ---------------------------------------------------------------------------
+try:
     init_db()
+except Exception as _init_err:
+    import logging as _log
+    _log.warning(f"init_db() skipped at import time: {_init_err}")
+
+if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
