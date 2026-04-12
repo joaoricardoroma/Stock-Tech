@@ -21,7 +21,7 @@ load_dotenv()
 
 from flask import (
     Flask, render_template, request, jsonify, redirect,
-    url_for, flash, session
+    url_for, flash, session, send_from_directory
 )
 from flask_login import (
     LoginManager, login_user, logout_user,
@@ -81,12 +81,21 @@ else:
     }
 
 # Invoice image upload config
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'invoices')
+if _is_serverless:
+    UPLOAD_FOLDER = '/tmp/uploads/invoices'
+else:
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'invoices')
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp', 'heic'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600  # 1-hour browser cache for static assets
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+except OSError as e:
+    import logging
+    logging.warning(f"Could not create upload folder {UPLOAD_FOLDER}: {e}")
 
 db.init_app(app)
 if _compress_available:
@@ -109,6 +118,15 @@ from sqlalchemy import event as sa_event
 @sa_event.listens_for(db.session, 'after_commit')
 def _clear_cache_on_commit(session):
     cache.clear()
+
+@app.route('/static/uploads/invoices/<path:filename>')
+def serve_uploads(filename):
+    """Serve uploaded invoices specifically from /tmp on Vercel so they don't break"""
+    if _is_serverless:
+        from flask import send_from_directory
+        return send_from_directory('/tmp/uploads/invoices', filename)
+    from flask import send_from_directory
+    return send_from_directory(os.path.join(app.root_path, 'static', 'uploads', 'invoices'), filename)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
