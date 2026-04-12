@@ -50,13 +50,16 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+_engine_options = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
-    'pool_size': 5,          # keep 5 connections warm to Neon
-    'max_overflow': 10,      # allow burst up to 15 total
-    'connect_args': {'connect_timeout': 10},
 }
+# pool_size / max_overflow only supported for non-SQLite engines
+if not _db_url.startswith('sqlite'):
+    _engine_options['pool_size'] = 5
+    _engine_options['max_overflow'] = 10
+    _engine_options['connect_args'] = {'connect_timeout': 10}  # PostgreSQL only
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = _engine_options
 
 # Invoice image upload config
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'invoices')
