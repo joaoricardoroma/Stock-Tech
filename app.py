@@ -10,6 +10,7 @@ import logging
 import os
 import io
 import uuid
+import base64
 from datetime import datetime, date, timedelta
 from functools import wraps
 from werkzeug.utils import secure_filename
@@ -574,34 +575,31 @@ def clear_invoice(purchase_id):
     is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
 
     if is_image:
-        # Always save compressed images as JPEG
-        unique_name = f"invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.jpg"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
         try:
             img = Image.open(file.stream)
-            # Convert to RGB (handles RGBA, palette, HEIC, etc.)
             if img.mode not in ('RGB', 'L'):
                 img = img.convert('RGB')
-            # Resize if wider than 1200px, maintain aspect ratio
             max_width = 1200
             if img.width > max_width:
-                ratio = max_width / img.width
-                new_size = (max_width, int(img.height * ratio))
-                img = img.resize(new_size, Image.LANCZOS)
-            # Save compressed JPEG (quality 75 — good quality, ~80% smaller)
-            img.save(save_path, format='JPEG', quality=75, optimize=True)
+                img = img.resize((max_width, int(img.height * (max_width / img.width))), Image.LANCZOS)
+            
+            # Compress and convert to base64
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=75, optimize=True)
+            encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            purchase.invoice_image_path = f"data:image/jpeg;base64,{encoded}"
         except Exception as compress_err:
-            # Fall back to saving the original if Pillow fails
-            app.logger.warning(f'Pillow compression failed: {compress_err}, saving original')
+            app.logger.warning(f'Pillow compression failed: {compress_err}, encoding original')
             file.seek(0)
-            file.save(save_path)
+            encoded = base64.b64encode(file.read()).decode('utf-8')
+            mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
+            purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
     else:
-        # PDFs saved as-is
-        unique_name = f"invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.{ext}"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        file.save(save_path)
-
-    purchase.invoice_image_path = f"uploads/invoices/{unique_name}"
+        # PDFs saved as base64
+        file.seek(0)
+        encoded = base64.b64encode(file.read()).decode('utf-8')
+        mime = 'application/pdf' if ext == 'pdf' else f'application/{ext}'
+        purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
     purchase.invoice_image_original = secure_filename(file.filename)
     purchase.is_invoice_cleared = True
     purchase.date_cleared = datetime.utcnow()
@@ -638,7 +636,7 @@ def get_wine_invoices(wine_id):
             'date_ordered': p.date_ordered.isoformat(),
             'date_cleared': p.date_cleared.isoformat() if p.date_cleared else None,
             'quantity_ordered': p.quantity_ordered,
-            'image_url': f"/static/{p.invoice_image_path}",
+            'image_url': p.invoice_image_path if p.invoice_image_path and p.invoice_image_path.startswith('data:') else f"/static/{p.invoice_image_path}",
             'image_original': p.invoice_image_original,
         })
 
@@ -1179,23 +1177,26 @@ def record_corked():
             ext = file.filename.rsplit('.', 1)[1].lower()
             is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
             if is_image:
-                unique_name = f"corked_{wine_id}_{uuid.uuid4().hex[:8]}.jpg"
-                save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
                 try:
                     img = Image.open(file.stream)
                     if img.mode not in ('RGB', 'L'):
                         img = img.convert('RGB')
                     if img.width > 1200:
-                        ratio = 1200 / img.width
-                        img = img.resize((1200, int(img.height * ratio)), Image.LANCZOS)
-                    img.save(save_path, format='JPEG', quality=75, optimize=True)
+                        img = img.resize((1200, int(img.height * (1200 / img.width))), Image.LANCZOS)
+                    buffer = io.BytesIO()
+                    img.save(buffer, format='JPEG', quality=75, optimize=True)
+                    encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    image_path = f"data:image/jpeg;base64,{encoded}"
                 except Exception:
-                    file.seek(0); file.save(save_path)
+                    file.seek(0)
+                    encoded = base64.b64encode(file.read()).decode('utf-8')
+                    mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
+                    image_path = f"data:{mime};base64,{encoded}"
             else:
-                unique_name = f"corked_{wine_id}_{uuid.uuid4().hex[:8]}.{ext}"
-                save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-                file.save(save_path)
-            image_path = f"uploads/invoices/{unique_name}"
+                file.seek(0)
+                encoded = base64.b64encode(file.read()).decode('utf-8')
+                mime = 'application/pdf' if ext == 'pdf' else f'application/{ext}'
+                image_path = f"data:{mime};base64,{encoded}"
             image_original = secure_filename(file.filename)
 
     corked = CorkedWine(
@@ -1617,23 +1618,26 @@ def bar_clear_invoice(purchase_id):
     ext = file.filename.rsplit('.', 1)[1].lower()
     is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
     if is_image:
-        unique_name = f"bar_invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.jpg"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
         try:
             img = Image.open(file.stream)
             if img.mode not in ('RGB', 'L'):
                 img = img.convert('RGB')
             if img.width > 1200:
-                ratio = 1200 / img.width
-                img = img.resize((1200, int(img.height * ratio)), Image.LANCZOS)
-            img.save(save_path, format='JPEG', quality=75, optimize=True)
+                img = img.resize((1200, int(img.height * (1200 / img.width))), Image.LANCZOS)
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=75, optimize=True)
+            encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            purchase.invoice_image_path = f"data:image/jpeg;base64,{encoded}"
         except Exception:
-            file.seek(0); file.save(save_path)
+            file.seek(0)
+            encoded = base64.b64encode(file.read()).decode('utf-8')
+            mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
+            purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
     else:
-        unique_name = f"bar_invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.{ext}"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        file.save(save_path)
-    purchase.invoice_image_path = f"uploads/invoices/{unique_name}"
+        file.seek(0)
+        encoded = base64.b64encode(file.read()).decode('utf-8')
+        mime = 'application/pdf' if ext == 'pdf' else f'application/{ext}'
+        purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
     purchase.invoice_image_original = secure_filename(file.filename)
     purchase.is_invoice_cleared = True
     purchase.date_cleared = datetime.utcnow()
@@ -1924,13 +1928,34 @@ def init_db():
                     if 'pairing_group_id' not in cols:
                         conn.execute(text('ALTER TABLE wine_sales ADD COLUMN pairing_group_id VARCHAR(36)'))
                 
+                is_postgres = str(db.engine.url).startswith('postgres')
+                
                 # Add invoice image columns to wine_purchases if missing
                 if 'wine_purchases' in inspector.get_table_names():
                     cols = [c['name'] for c in inspector.get_columns('wine_purchases')]
                     if 'invoice_image_path' not in cols:
-                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_path VARCHAR(500)'))
+                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_path TEXT'))
+                    elif is_postgres:
+                        conn.execute(text('ALTER TABLE wine_purchases ALTER COLUMN invoice_image_path TYPE TEXT'))
+                    
                     if 'invoice_image_original' not in cols:
                         conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_original VARCHAR(300)'))
+
+                if 'spirit_purchases' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('spirit_purchases')]
+                    if 'invoice_image_path' not in cols:
+                        conn.execute(text('ALTER TABLE spirit_purchases ADD COLUMN invoice_image_path TEXT'))
+                    elif is_postgres:
+                        conn.execute(text('ALTER TABLE spirit_purchases ALTER COLUMN invoice_image_path TYPE TEXT'))
+                        
+                    if 'invoice_image_original' not in cols:
+                        conn.execute(text('ALTER TABLE spirit_purchases ADD COLUMN invoice_image_original VARCHAR(300)'))
+
+                if 'corked_wines' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('corked_wines')]
+                    if 'image_path' in cols and is_postgres:
+                        conn.execute(text('ALTER TABLE corked_wines ALTER COLUMN image_path TYPE TEXT'))
+                
                 conn.commit()
         except Exception as e:
             import logging

@@ -181,7 +181,7 @@ class CorkedWine(db.Model):
     supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    image_path = db.Column(db.String(500), nullable=True)       # optional photo
+    image_path = db.Column(db.Text, nullable=True)       # optional photo (base64 string)
     image_original = db.Column(db.String(300), nullable=True)
     notes = db.Column(db.String(300), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -252,7 +252,7 @@ class WinePurchase(db.Model):
     quantity_ordered = db.Column(db.Integer, nullable=False, default=1)
     is_invoice_cleared = db.Column(db.Boolean, nullable=False, default=False)
     date_cleared = db.Column(db.DateTime, nullable=True)
-    invoice_image_path = db.Column(db.String(500), nullable=True)       # stored file path
+    invoice_image_path = db.Column(db.Text, nullable=True)       # stored base64 data URI
     invoice_image_original = db.Column(db.String(300), nullable=True)   # original filename
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -427,7 +427,7 @@ class SpiritPurchase(db.Model):
     cost_per_bottle = db.Column(db.Float, nullable=True)     # actual invoice cost (may differ)
     is_invoice_cleared = db.Column(db.Boolean, nullable=False, default=False)
     date_cleared = db.Column(db.DateTime, nullable=True)
-    invoice_image_path = db.Column(db.String(500), nullable=True)
+    invoice_image_path = db.Column(db.Text, nullable=True)
     invoice_image_original = db.Column(db.String(300), nullable=True)
     notes = db.Column(db.String(300), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

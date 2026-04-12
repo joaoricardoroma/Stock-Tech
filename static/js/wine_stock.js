@@ -820,7 +820,7 @@ async function openInvoiceGallery(wineId, wineName) {
         }
 
         grid.innerHTML = invoices.map(inv => {
-            const isPdf = inv.image_url.endsWith('.pdf');
+            const isPdf = inv.image_url.endsWith('.pdf') || inv.image_url.includes('application/pdf');
             const thumbnail = isPdf
                 ? `<div class="invoice-thumb-placeholder"><i class="fas fa-file-pdf"></i></div>`
                 : `<img src="${inv.image_url}" alt="Invoice" class="invoice-thumb-img" onclick="window.open('${inv.image_url}', '_blank')"/>`;
