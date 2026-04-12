@@ -28,7 +28,11 @@ from flask_login import (
     login_required, current_user
 )
 from flask_caching import Cache
-from flask_compress import Compress
+try:
+    from flask_compress import Compress
+    _compress_available = True
+except ImportError:
+    _compress_available = False
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -70,7 +74,8 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600  # 1-hour browser cache for stati
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 db.init_app(app)
-Compress(app)  # gzip all responses automatically (saves ~70% bandwidth on JSON & HTML)
+if _compress_available:
+    Compress(app)  # gzip all responses automatically (saves ~70% bandwidth on JSON & HTML)
 
 # ---------------------------------------------------------------------------
 # Cache — SimpleCache (in-process, single worker)
