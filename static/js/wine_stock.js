@@ -329,7 +329,7 @@ function addPairingRow() {
     const container = document.getElementById('pairingRows');
     const rowId = `pr_${pairingRowCount++}`;
     const wineOptions = winesData.map(w =>
-        `<option value="${w.id}">${w.name} (Stock: ${w.stock_display})</option>`
+        `<option value="${w.id}">${w.wine_number ? w.wine_number + '. ' : ''}${w.name} (Stock: ${w.stock_display})</option>`
     ).join('');
 
     const div = document.createElement('div');
@@ -600,7 +600,11 @@ async function submitNewWine() {
     const name = document.getElementById('newWineName').value.trim();
     if (!name) { showToast('Wine name is required', 'warning'); return; }
 
+    const wineNumberEl = document.getElementById('newWineNumber');
+    const wineNumber = wineNumberEl && wineNumberEl.value ? parseInt(wineNumberEl.value) : null;
+
     const body = {
+        wine_number: wineNumber,
         name,
         supplier_id: document.getElementById('newWineSupplier').value || null,
         cost_price: document.getElementById('newWineCost').value,
@@ -620,7 +624,8 @@ async function submitNewWine() {
 
         const data = await resp.json();
         if (data.success) {
-            showToast(`${name} added successfully!`, 'success');
+            const displayName = wineNumber ? `#${wineNumber} ${name}` : name;
+            showToast(`${displayName} added successfully!`, 'success');
             closeModal('addWineModal');
             setTimeout(() => location.reload(), 1200);
         } else {
@@ -672,6 +677,9 @@ async function editWine(wineId) {
         const wine = await resp.json();
 
         document.getElementById('editWineId').value = wine.id;
+        // Show wine_number if the field exists
+        const wineNumEl = document.getElementById('editWineNumber');
+        if (wineNumEl) wineNumEl.value = wine.wine_number || '';
         document.getElementById('editWineName').value = wine.name;
         document.getElementById('editWineSupplier').value = wine.supplier_id || '';
         document.getElementById('editWineCost').value = wine.cost_price;
@@ -689,7 +697,11 @@ async function editWine(wineId) {
 
 async function submitEditWine() {
     const wineId = document.getElementById('editWineId').value;
+    const wineNumEl = document.getElementById('editWineNumber');
+    const wineNumber = wineNumEl && wineNumEl.value ? parseInt(wineNumEl.value) : null;
+
     const body = {
+        wine_number: wineNumber,
         name: document.getElementById('editWineName').value,
         supplier_id: document.getElementById('editWineSupplier').value || null,
         cost_price: document.getElementById('editWineCost').value,
@@ -717,6 +729,75 @@ async function submitEditWine() {
         }
     } catch (err) {
         showToast('Network error', 'danger');
+    }
+}
+
+// ===================================================================
+// Delete Wine
+// ===================================================================
+async function confirmDeleteWine(wineId, wineName) {
+    // Create a confirm overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.id = 'deleteConfirmOverlay';
+
+    overlay.innerHTML = `
+        <div style="background:var(--surface-card);border:1px solid rgba(231,76,60,0.4);border-radius:24px;padding:32px;max-width:400px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <div style="width:48px;height:48px;border-radius:12px;background:rgba(231,76,60,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-trash" style="font-size:20px;color:var(--accent-red);"></i>
+                </div>
+                <div>
+                    <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary);">Delete Wine?</div>
+                    <div style="font-size:0.82rem;color:var(--text-muted);margin-top:2px;">This cannot be undone</div>
+                </div>
+            </div>
+            <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:20px;">
+                Are you sure you want to delete <strong style="color:var(--text-primary);">${wineName}</strong>?
+                <br><span style="font-size:0.8rem;color:var(--accent-red);">All sales, purchases, comps and corked records for this wine will also be deleted.</span>
+            </p>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="document.getElementById('deleteConfirmOverlay').remove()" 
+                        style="padding:10px 20px;background:var(--surface-glass);border:1px solid var(--border-color);border-radius:10px;color:var(--text-secondary);font-weight:600;cursor:pointer;">
+                    Cancel
+                </button>
+                <button onclick="executeDeleteWine(${wineId})" id="confirmDeleteBtn"
+                        style="padding:10px 20px;background:linear-gradient(135deg,#e74c3c,#c0392b);border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;">
+                    <i class="fas fa-trash"></i> Delete Wine
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function executeDeleteWine(wineId) {
+    const btn = document.getElementById('confirmDeleteBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+    }
+
+    try {
+        const resp = await fetch(`/api/wine/${wineId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) {
+            showToast('Wine deleted successfully!', 'success');
+            const overlay = document.getElementById('deleteConfirmOverlay');
+            if (overlay) overlay.remove();
+            // Remove the row from the table
+            const row = document.getElementById(`wineRow${wineId}`);
+            if (row) row.style.transition = 'opacity 0.3s'; row && (row.style.opacity = '0');
+            const card = document.getElementById(`stockCard${wineId}`);
+            if (card) card.style.transition = 'opacity 0.3s', card.style.opacity = '0';
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showToast(data.error || 'Failed to delete wine', 'danger');
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash"></i> Delete Wine'; }
+        }
+    } catch (err) {
+        showToast('Network error', 'danger');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash"></i> Delete Wine'; }
     }
 }
 

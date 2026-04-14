@@ -1780,67 +1780,7 @@
     gap: 6px;
   }
 
-  .bar-pending-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
 
-  .bar-pending-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 18px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--glass-radius-sm, 10px);
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-
-  .bar-pending-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1;
-  }
-
-  .bar-pending-name {
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .bar-pending-date {
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  .bar-qty-badge {
-    background: var(--bar-green-dim);
-    color: var(--bar-green);
-    padding: 4px 12px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 14px;
-  }
-
-  .btn-clear-bar-invoice {
-    background: rgba(52,211,153,0.1);
-    border: 1px solid rgba(52,211,153,0.3);
-    color: var(--bar-green);
-    border-radius: 10px;
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-  }
-
-  .btn-clear-bar-invoice:hover {
-    background: rgba(52,211,153,0.2);
-    border-color: rgba(52,211,153,0.5);
-  }
 
   /* ===== SECTION BADGE ===== */
   .section-badge {
@@ -2030,7 +1970,7 @@
 </section>
 
 <!-- §2 ALERTS -->
-{% if low_stock_spirits or pending_purchases %}
+{% if low_stock_spirits %}
 <section class="dashboard-section animate-in animate-delay-2" id="sectionBarAlerts">
   <div class="section-header">
     <h2 class="section-title">
@@ -2042,7 +1982,6 @@
     <span class="section-badge alert-badge">{{ low_stock_spirits|length }} alerts</span>
   </div>
 
-  {% if low_stock_spirits %}
   <div class="bar-alert-subtitle"><i class="fas fa-arrow-trend-down"></i> Low Stock — Reorder Required</div>
   <div class="bar-alert-cards-grid">
     {% for s in low_stock_spirits %}
@@ -2066,25 +2005,6 @@
     </div>
     {% endfor %}
   </div>
-  {% endif %}
-
-  {% if pending_purchases %}
-  <div class="bar-alert-subtitle" style="margin-top:28px;"><i class="fas fa-file-invoice"></i> Pending Invoices</div>
-  <div class="bar-pending-list">
-    {% for p in pending_purchases %}
-    <div class="bar-pending-row" id="alertPurchase{{ p.id }}">
-      <div class="bar-pending-info">
-        <span class="bar-pending-name">{{ p.spirit_name }}</span>
-        <span class="bar-pending-date">Ordered {{ p.date_ordered }} · {{ p.bottles_ordered }} bottles</span>
-      </div>
-      <span class="bar-qty-badge">+{{ p.bottles_ordered }}</span>
-      <button class="btn-clear-bar-invoice" onclick="clearInvoice({{ p.id }})" id="clearInvoiceBtn{{ p.id }}">
-        <i class="fas fa-check"></i> Clear
-      </button>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
 </section>
 {% endif %}
 
@@ -2564,84 +2484,6 @@
     const res = await fetch('/api/bar/spirit/purchase', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (res.ok) location.reload(); else { const err = await res.json().catch(()=>({})); alert('Error creating purchase: ' + (err.error||res.status)); }
   }
-  /* ── BAR CLEAR INVOICE MODAL ── */
-  let _barClearPurchaseId = null;
-
-  function clearInvoice(purchaseId) {
-    _barClearPurchaseId = purchaseId;
-    // Reset modal
-    document.getElementById('barClearFileInput').value = '';
-    document.getElementById('barClearCameraInput').value = '';
-    document.getElementById('barClearPreviewImg').style.display = 'none';
-    document.getElementById('barClearPlaceholder').style.display = 'flex';
-    document.getElementById('barClearFileName').textContent = '';
-    const modal = document.getElementById('barClearInvoiceModal');
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function barClearChooseFile() {
-    document.getElementById('barClearFileInput').click();
-  }
-
-  function barClearTakePhoto() {
-    document.getElementById('barClearCameraInput').click();
-  }
-
-  function barClearPreview(input) {
-    const file = input.files[0];
-    if (!file) return;
-    document.getElementById('barClearFileName').textContent = file.name;
-    const img = document.getElementById('barClearPreviewImg');
-    const ph = document.getElementById('barClearPlaceholder');
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = e => { img.src = e.target.result; img.style.display = 'block'; ph.style.display = 'none'; };
-      reader.readAsDataURL(file);
-    } else {
-      ph.innerHTML = `<i class="fas fa-file-pdf" style="font-size:36px;color:var(--bar-coral);margin-bottom:8px;"></i><p style="font-size:12px;">${file.name}</p>`;
-    }
-    // Sync to the other input (so submit always finds a file)
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    document.getElementById('barClearFileInput').files = dt.files;
-    document.getElementById('barClearCameraInput').files = dt.files;
-  }
-
-  async function submitBarClearInvoice() {
-    const fileInput = document.getElementById('barClearFileInput');
-    const file = fileInput.files[0];
-    if (!file) {
-      showToast('Please choose a photo or file first.', 'warning'); return;
-    }
-    const btn = document.getElementById('btnBarClearConfirm');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-    const fd = new FormData();
-    fd.append('invoice_image', file);
-    try {
-      const res = await fetch(`/api/bar/spirit/clear-invoice/${_barClearPurchaseId}`, { method: 'POST', body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
-        showToast('Invoice cleared! Stock updated.', 'success');
-        document.getElementById('barClearInvoiceModal').classList.remove('active');
-        document.body.style.overflow = '';
-        setTimeout(() => location.reload(), 1000);
-      } else {
-        showToast('Error: ' + (data.error || `Server responded ${res.status}`), 'danger');
-      }
-    } catch (err) {
-      showToast('Connection error — check your network and try again.', 'danger');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-check"></i> Confirm & Add to Stock';
-    }
-  }
-
-  function closeBarClearModal() {
-    document.getElementById('barClearInvoiceModal').classList.remove('active');
-    document.body.style.overflow = '';
-  }
 
   /* ── ADD/EDIT SUB-INGREDIENT ── */
   function editSubIng(id) {
@@ -3053,67 +2895,6 @@
      MODALS
      ═══════════════════════════════════════════════ -->
 
-<!-- BAR CLEAR INVOICE MODAL -->
-<div class="modal-overlay modal-glass" id="barClearInvoiceModal" onclick="if(event.target===this)closeBarClearModal()">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header" style="position:relative;">
-        <h5 class="modal-title"><i class="fas fa-camera" style="color:var(--bar-amber);margin-right:8px;"></i>Clear Invoice</h5>
-        <button class="modal-close-bar" onclick="closeBarClearModal()" id="closeBarClearModal"><i class="fas fa-times"></i></button>
-      </div>
-      <div class="modal-body" style="padding:20px 22px;">
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">Upload or photograph the invoice to confirm delivery and add stock.</p>
-
-        <!-- Upload Zone -->
-        <div id="barClearUploadZone" style="border:2px dashed var(--glass-border);border-radius:14px;overflow:hidden;background:rgba(255,255,255,0.02);min-height:160px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;position:relative;">
-          <div id="barClearPlaceholder" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 16px;text-align:center;">
-            <i class="fas fa-cloud-upload-alt" style="font-size:36px;color:var(--bar-amber);opacity:0.7;"></i>
-            <p style="font-size:13px;font-weight:600;color:var(--text-secondary);">Choose a file or take a photo below</p>
-            <p style="font-size:11px;color:var(--text-muted);">JPG, PNG, PDF, HEIC — max 16 MB</p>
-          </div>
-          <img id="barClearPreviewImg" src="" alt="Invoice preview"
-               style="display:none;max-width:100%;max-height:240px;object-fit:contain;border-radius:10px;">
-        </div>
-
-        <!-- File name indicator -->
-        <p id="barClearFileName" style="font-size:11px;color:var(--bar-teal);text-align:center;margin-bottom:14px;min-height:16px;"></p>
-
-        <!-- Hidden inputs -->
-        <input type="file" id="barClearFileInput" accept="image/*,application/pdf"
-               style="display:none;" onchange="barClearPreview(this)">
-        <input type="file" id="barClearCameraInput" accept="image/*"
-               capture="environment" style="display:none;" onchange="barClearPreview(this)">
-
-        <!-- Action buttons -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <button onclick="barClearTakePhoto()" id="btnBarClearCamera"
-                  style="display:flex;align-items:center;justify-content:center;gap:8px;
-                         padding:11px 0;border-radius:10px;border:1px solid rgba(251,191,36,0.4);
-                         background:rgba(251,191,36,0.08);color:var(--bar-amber);
-                         font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;">
-            <i class="fas fa-camera"></i> Take Photo
-          </button>
-          <button onclick="barClearChooseFile()" id="btnBarClearFile"
-                  style="display:flex;align-items:center;justify-content:center;gap:8px;
-                         padding:11px 0;border-radius:10px;border:1px solid var(--glass-border);
-                         background:var(--glass-bg);color:var(--text-secondary);
-                         font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;">
-            <i class="fas fa-folder-open"></i> Choose File
-          </button>
-        </div>
-      </div>
-      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px;padding:14px 22px 18px;">
-        <button class="btn-modal-cancel" onclick="closeBarClearModal()">Cancel</button>
-        <button id="btnBarClearConfirm" onclick="submitBarClearInvoice()"
-                style="background:linear-gradient(135deg,var(--bar-teal),#009e80);color:#000;border:none;
-                       border-radius:9px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;
-                       display:flex;align-items:center;gap:7px;transition:all .2s;">
-          <i class="fas fa-check"></i> Confirm &amp; Add to Stock
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- ADD/EDIT SPIRIT MODAL -->
 <div class="modal-overlay modal-glass" id="addSpiritModal">

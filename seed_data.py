@@ -184,68 +184,68 @@ def seed_wines(supplier_map):
     - Champagne (150ml pours): 5 glasses
     """
     wines_data = [
-        # FEVBRE wines
-        {'name': 'SVB NZ Main Divide', 'supplier': 'FEVBRE', 'cost_price': 12.00, 'glasses': 5, 'margin': 70, 'stock': 18.0},
-        {'name': 'Chardonnay Jordan South Africa', 'supplier': 'FEVBRE', 'cost_price': 15.30, 'glasses': 5, 'margin': 70, 'stock': 9.6},   # 9 btl + 3 glasses open
-        {'name': 'Albarino Martin Codax', 'supplier': 'FEVBRE', 'cost_price': 13.00, 'glasses': 5, 'margin': 70, 'stock': 14.4},           # 14 btl + 2 glasses
-        {'name': 'Esparao Alentejo Reserva', 'supplier': 'FEVBRE', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 15.0},
-        {'name': 'Pouilly Fume Ch. de Tracy', 'supplier': 'FEVBRE', 'cost_price': 23.00, 'glasses': 4, 'margin': 70, 'stock': 4.5},        # 4 btl + 2 glasses
-        {'name': 'Chablis le Verger', 'supplier': 'FEVBRE', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 6.25},               # 6 btl + 1 glass
-        {'name': 'CDR Le Caillou White', 'supplier': 'FEVBRE', 'cost_price': 10.50, 'glasses': 5, 'margin': 70, 'stock': 12.0},
-        {'name': 'Argentinian Malbec', 'supplier': 'FEVBRE', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 10.8},              # 10 btl + 4 glasses
-        {'name': 'Pinot Noir NZ Main Divide', 'supplier': 'FEVBRE', 'cost_price': 14.50, 'glasses': 5, 'margin': 70, 'stock': 7.0},
-        {'name': 'Meerkat', 'supplier': 'FEVBRE', 'cost_price': 8.50, 'glasses': 5, 'margin': 70, 'stock': 20.0},
-        {'name': 'Alentejo Esparao RED', 'supplier': 'FEVBRE', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 9.2},             # 9 btl + 1 glass
-        {'name': "Nero d'Avola", 'supplier': 'FEVBRE', 'cost_price': 9.80, 'glasses': 5, 'margin': 70, 'stock': 11.6},                    # 11 btl + 3 glasses
-        {'name': 'Bourgogne Valmoisine', 'supplier': 'FEVBRE', 'cost_price': 19.00, 'glasses': 4, 'margin': 70, 'stock': 5.0},
+        # FEVBRE wines — wine numbers from April 2026 wine list
+        {'wine_number': 1,   'name': 'SVB NZ Main Divide', 'supplier': 'FEVBRE', 'cost_price': 12.00, 'glasses': 5, 'margin': 70, 'stock': 18.0},
+        {'wine_number': 2,   'name': 'Chardonnay Jordan South Africa', 'supplier': 'FEVBRE', 'cost_price': 15.30, 'glasses': 5, 'margin': 70, 'stock': 9.6},
+        {'wine_number': 4,   'name': 'Albarino Martin Codax', 'supplier': 'FEVBRE', 'cost_price': 13.00, 'glasses': 5, 'margin': 70, 'stock': 14.4},
+        {'wine_number': 5,   'name': 'Esparao Alentejo Reserva', 'supplier': 'FEVBRE', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 15.0},
+        {'wine_number': 12,  'name': 'Pouilly Fume Ch. de Tracy', 'supplier': 'FEVBRE', 'cost_price': 23.00, 'glasses': 4, 'margin': 70, 'stock': 4.5},
+        {'wine_number': 18,  'name': 'Chablis le Verger', 'supplier': 'FEVBRE', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 6.25},
+        {'wine_number': 33,  'name': 'CDR Le Caillou White', 'supplier': 'FEVBRE', 'cost_price': 10.50, 'glasses': 5, 'margin': 70, 'stock': 12.0},
+        {'wine_number': 34,  'name': 'Argentinian Malbec', 'supplier': 'FEVBRE', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 10.8},
+        {'wine_number': 35,  'name': 'Pinot Noir NZ Main Divide', 'supplier': 'FEVBRE', 'cost_price': 14.50, 'glasses': 5, 'margin': 70, 'stock': 7.0},
+        {'wine_number': None, 'name': 'Meerkat', 'supplier': 'FEVBRE', 'cost_price': 8.50, 'glasses': 5, 'margin': 70, 'stock': 20.0},
+        {'wine_number': 42,  'name': 'Alentejo Esparao RED', 'supplier': 'FEVBRE', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 9.2},
+        {'wine_number': 46,  'name': "Nero d'Avola", 'supplier': 'FEVBRE', 'cost_price': 9.80, 'glasses': 5, 'margin': 70, 'stock': 11.6},
+        {'wine_number': 75,  'name': 'Bourgogne Valmoisine', 'supplier': 'FEVBRE', 'cost_price': 19.00, 'glasses': 4, 'margin': 70, 'stock': 5.0},
         # CLASSIC DRINKS
-        {'name': 'Albarino Terras Gauda', 'supplier': 'CLASSIC DRINKS', 'cost_price': 16.50, 'glasses': 5, 'margin': 70, 'stock': 6.4},    # 6 btl + 2 glasses
-        {'name': 'Overture', 'supplier': 'CLASSIC DRINKS', 'cost_price': 9.50, 'glasses': 5, 'margin': 70, 'stock': 12.0},
-        {'name': 'Valpolicella Vega Sicilia', 'supplier': 'CLASSIC DRINKS', 'cost_price': 14.00, 'glasses': 5, 'margin': 70, 'stock': 8.0},
-        {'name': 'Clos du Pape', 'supplier': 'CLASSIC DRINKS', 'cost_price': 45.00, 'glasses': 4, 'margin': 70, 'stock': 3.75},            # 3 btl + 3 glasses
-        {'name': 'Gevrey Chambertin', 'supplier': 'CLASSIC DRINKS', 'cost_price': 38.00, 'glasses': 4, 'margin': 70, 'stock': 2.5},        # 2 btl + 2 glasses
+        {'wine_number': None, 'name': 'Albarino Terras Gauda', 'supplier': 'CLASSIC DRINKS', 'cost_price': 16.50, 'glasses': 5, 'margin': 70, 'stock': 6.4},
+        {'wine_number': 39,  'name': 'Overture', 'supplier': 'CLASSIC DRINKS', 'cost_price': 9.50, 'glasses': 5, 'margin': 70, 'stock': 12.0},
+        {'wine_number': 48,  'name': 'Valpolicella Vega Sicilia', 'supplier': 'CLASSIC DRINKS', 'cost_price': 14.00, 'glasses': 5, 'margin': 70, 'stock': 8.0},
+        {'wine_number': 64,  'name': 'Clos du Pape', 'supplier': 'CLASSIC DRINKS', 'cost_price': 45.00, 'glasses': 4, 'margin': 70, 'stock': 3.75},
+        {'wine_number': 78,  'name': 'Gevrey Chambertin', 'supplier': 'CLASSIC DRINKS', 'cost_price': 38.00, 'glasses': 4, 'margin': 70, 'stock': 2.5},
         # CAUBET WINES
-        {'name': 'Pinot Grigio', 'supplier': 'CAUBET WINES', 'cost_price': 8.50, 'glasses': 5, 'margin': 70, 'stock': 18.0},
-        {'name': 'Muscadet', 'supplier': 'CAUBET WINES', 'cost_price': 9.00, 'glasses': 5, 'margin': 70, 'stock': 12.0},
-        {'name': 'Macon-Peronne', 'supplier': 'CAUBET WINES', 'cost_price': 14.00, 'glasses': 5, 'margin': 70, 'stock': 6.6},              # 6 btl + 3 glasses
-        {'name': 'Saint-Veran', 'supplier': 'CAUBET WINES', 'cost_price': 17.00, 'glasses': 4, 'margin': 70, 'stock': 5.0},
-        {'name': 'Saint-Aubin Thomas Morey', 'supplier': 'CAUBET WINES', 'cost_price': 25.00, 'glasses': 4, 'margin': 70, 'stock': 3.25},  # 3 btl + 1 glass
+        {'wine_number': 6,   'name': 'Pinot Grigio', 'supplier': 'CAUBET WINES', 'cost_price': 8.50, 'glasses': 5, 'margin': 70, 'stock': 18.0},
+        {'wine_number': 8,   'name': 'Muscadet', 'supplier': 'CAUBET WINES', 'cost_price': 9.00, 'glasses': 5, 'margin': 70, 'stock': 12.0},
+        {'wine_number': 17,  'name': 'Macon-Peronne', 'supplier': 'CAUBET WINES', 'cost_price': 14.00, 'glasses': 5, 'margin': 70, 'stock': 6.6},
+        {'wine_number': 19,  'name': 'Saint-Veran', 'supplier': 'CAUBET WINES', 'cost_price': 17.00, 'glasses': 4, 'margin': 70, 'stock': 5.0},
+        {'wine_number': 25,  'name': 'Saint-Aubin Thomas Morey', 'supplier': 'CAUBET WINES', 'cost_price': 25.00, 'glasses': 4, 'margin': 70, 'stock': 3.25},
         # BARRY & FITZWILLIAM
-        {'name': 'Rioja Reserva Beronia', 'supplier': 'BARRY & FITZWILLIAM', 'cost_price': 13.50, 'glasses': 5, 'margin': 70, 'stock': 8.0},
-        {'name': 'Chateau Neuf du Pape Gabriel Meffre', 'supplier': 'BARRY & FITZWILLIAM', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 4.0},
-        {'name': 'Pedro Ximenes Noe', 'supplier': 'BARRY & FITZWILLIAM', 'cost_price': 28.00, 'glasses': 6, 'margin': 70, 'stock': 2.5},   # 2 btl + 3 glasses (6-glass sherry)
+        {'wine_number': 40,  'name': 'Rioja Reserva Beronia', 'supplier': 'BARRY & FITZWILLIAM', 'cost_price': 13.50, 'glasses': 5, 'margin': 70, 'stock': 8.0},
+        {'wine_number': 59,  'name': 'Chateau Neuf du Pape Gabriel Meffre', 'supplier': 'BARRY & FITZWILLIAM', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 4.0},
+        {'wine_number': 106, 'name': 'Pedro Ximenes Noe', 'supplier': 'BARRY & FITZWILLIAM', 'cost_price': 28.00, 'glasses': 6, 'margin': 70, 'stock': 2.5},
         # CLASSIC GOURMET
-        {'name': 'Pouilly Fuisse', 'supplier': 'CLASSIC GOURMET', 'cost_price': 24.00, 'glasses': 4, 'margin': 70, 'stock': 4.0},
-        {'name': 'Saint-Amour', 'supplier': 'CLASSIC GOURMET', 'cost_price': 18.00, 'glasses': 5, 'margin': 70, 'stock': 5.0},
-        {'name': 'Chateau Cap de Faugeres', 'supplier': 'CLASSIC GOURMET', 'cost_price': 19.00, 'glasses': 4, 'margin': 70, 'stock': 3.0},
-        {'name': 'Saint Emilion Grand Cru', 'supplier': 'CLASSIC GOURMET', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 2.5}, # 2 btl + 2 glasses
+        {'wine_number': 21,  'name': 'Pouilly Fuisse', 'supplier': 'CLASSIC GOURMET', 'cost_price': 24.00, 'glasses': 4, 'margin': 70, 'stock': 4.0},
+        {'wine_number': 69,  'name': 'Saint-Amour', 'supplier': 'CLASSIC GOURMET', 'cost_price': 18.00, 'glasses': 5, 'margin': 70, 'stock': 5.0},
+        {'wine_number': 85,  'name': 'Chateau Cap de Faugeres', 'supplier': 'CLASSIC GOURMET', 'cost_price': 19.00, 'glasses': 4, 'margin': 70, 'stock': 3.0},
+        {'wine_number': 86,  'name': 'Saint Emilion Grand Cru', 'supplier': 'CLASSIC GOURMET', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 2.5},
         # LAROUSSE
-        {'name': 'Touraine SVB Vincent La Cour', 'supplier': 'LAROUSSE', 'cost_price': 12.00, 'glasses': 5, 'margin': 70, 'stock': 10.0},
-        {'name': 'Gruner Veltliner Heinz W', 'supplier': 'LAROUSSE', 'cost_price': 13.50, 'glasses': 4, 'margin': 70, 'stock': 7.5},       # 7 btl + 2 glasses
+        {'wine_number': 9,   'name': 'Touraine SVB Vincent La Cour', 'supplier': 'LAROUSSE', 'cost_price': 12.00, 'glasses': 5, 'margin': 70, 'stock': 10.0},
+        {'wine_number': 14,  'name': 'Gruner Veltliner Heinz W', 'supplier': 'LAROUSSE', 'cost_price': 13.50, 'glasses': 4, 'margin': 70, 'stock': 7.5},
         # LE CAVEAU
-        {'name': 'Chianti', 'supplier': 'LE CAVEAU', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 14.0},
-        {'name': 'Corbieres', 'supplier': 'LE CAVEAU', 'cost_price': 9.50, 'glasses': 5, 'margin': 70, 'stock': 10.0},
-        {'name': 'Cahors', 'supplier': 'LE CAVEAU', 'cost_price': 10.00, 'glasses': 5, 'margin': 70, 'stock': 8.4},                        # 8 btl + 2 glasses
-        {'name': 'Cotes de Nuits Village', 'supplier': 'LE CAVEAU', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 3.0},
-        {'name': 'Nuits-Saint-Georges', 'supplier': 'LE CAVEAU', 'cost_price': 32.00, 'glasses': 4, 'margin': 70, 'stock': 2.0},
+        {'wine_number': 47,  'name': 'Chianti', 'supplier': 'LE CAVEAU', 'cost_price': 11.00, 'glasses': 5, 'margin': 70, 'stock': 14.0},
+        {'wine_number': 65,  'name': 'Corbieres', 'supplier': 'LE CAVEAU', 'cost_price': 9.50, 'glasses': 5, 'margin': 70, 'stock': 10.0},
+        {'wine_number': 67,  'name': 'Cahors', 'supplier': 'LE CAVEAU', 'cost_price': 10.00, 'glasses': 5, 'margin': 70, 'stock': 8.4},
+        {'wine_number': 73,  'name': 'Cotes de Nuits Village', 'supplier': 'LE CAVEAU', 'cost_price': 22.00, 'glasses': 4, 'margin': 70, 'stock': 3.0},
+        {'wine_number': 77,  'name': 'Nuits-Saint-Georges', 'supplier': 'LE CAVEAU', 'cost_price': 32.00, 'glasses': 4, 'margin': 70, 'stock': 2.0},
         # CASSIDY WINES
-        {'name': 'Shiraz McRae Wood', 'supplier': 'CASSIDY WINES', 'cost_price': 16.00, 'glasses': 5, 'margin': 70, 'stock': 6.0},
-        {'name': 'Ribera Del Duero Emilio Moro', 'supplier': 'CASSIDY WINES', 'cost_price': 18.00, 'glasses': 4, 'margin': 70, 'stock': 5.0},
-        {'name': 'ROSE Cotes de Provence', 'supplier': 'CASSIDY WINES', 'cost_price': 14.50, 'glasses': 5, 'margin': 70, 'stock': 7.0},
+        {'wine_number': 37,  'name': 'Shiraz McRae Wood', 'supplier': 'CASSIDY WINES', 'cost_price': 16.00, 'glasses': 5, 'margin': 70, 'stock': 6.0},
+        {'wine_number': 43,  'name': 'Ribera Del Duero Emilio Moro', 'supplier': 'CASSIDY WINES', 'cost_price': 18.00, 'glasses': 4, 'margin': 70, 'stock': 5.0},
+        {'wine_number': 53,  'name': 'ROSE Cotes de Provence', 'supplier': 'CASSIDY WINES', 'cost_price': 14.50, 'glasses': 5, 'margin': 70, 'stock': 7.0},
         # TINDAL
-        {'name': 'SVB Pech des Cades', 'supplier': 'TINDAL', 'cost_price': 7.95, 'glasses': 5, 'margin': 70, 'stock': 35.0},
-        {'name': 'Antinori', 'supplier': 'TINDAL', 'cost_price': 15.00, 'glasses': 4, 'margin': 70, 'stock': 7.0},
+        {'wine_number': 31,  'name': 'SVB Pech des Cades', 'supplier': 'TINDAL', 'cost_price': 7.95, 'glasses': 5, 'margin': 70, 'stock': 35.0},
+        {'wine_number': 7,   'name': 'Antinori', 'supplier': 'TINDAL', 'cost_price': 15.00, 'glasses': 4, 'margin': 70, 'stock': 7.0},
         # EDWARD DILLON
-        {'name': 'Champagne Ruinart BLC de BLC', 'supplier': 'EDWARD DILLON', 'cost_price': 55.00, 'glasses': 5, 'margin': 65, 'stock': 3.4},  # 3 btl + 2 glasses
-        {'name': 'Champagne Dom Perignon', 'supplier': 'EDWARD DILLON', 'cost_price': 120.00, 'glasses': 5, 'margin': 60, 'stock': 2.0},
-        {'name': 'Champagne Veuve Clicquot Rose', 'supplier': 'EDWARD DILLON', 'cost_price': 52.00, 'glasses': 5, 'margin': 65, 'stock': 4.6},  # 4 btl + 3 glasses
+        {'wine_number': 112, 'name': 'Champagne Ruinart BLC de BLC', 'supplier': 'EDWARD DILLON', 'cost_price': 55.00, 'glasses': 5, 'margin': 65, 'stock': 3.4},
+        {'wine_number': 113, 'name': 'Champagne Dom Perignon', 'supplier': 'EDWARD DILLON', 'cost_price': 120.00, 'glasses': 5, 'margin': 60, 'stock': 2.0},
+        {'wine_number': 115, 'name': 'Champagne Veuve Clicquot Rose', 'supplier': 'EDWARD DILLON', 'cost_price': 52.00, 'glasses': 5, 'margin': 65, 'stock': 4.6},
         # NOMAD
-        {'name': 'White Sancerre', 'supplier': 'NOMAD', 'cost_price': 18.00, 'glasses': 4, 'margin': 70, 'stock': 6.0},
-        {'name': 'Bourgogne Chardonnay Closel', 'supplier': 'NOMAD', 'cost_price': 16.00, 'glasses': 5, 'margin': 70, 'stock': 5.2},       # 5 btl + 1 glass
-        {'name': 'Chassagne Montrachet', 'supplier': 'NOMAD', 'cost_price': 35.00, 'glasses': 4, 'margin': 70, 'stock': 2.0},
+        {'wine_number': 13,  'name': 'White Sancerre', 'supplier': 'NOMAD', 'cost_price': 18.00, 'glasses': 4, 'margin': 70, 'stock': 6.0},
+        {'wine_number': 20,  'name': 'Bourgogne Chardonnay Closel', 'supplier': 'NOMAD', 'cost_price': 16.00, 'glasses': 5, 'margin': 70, 'stock': 5.2},
+        {'wine_number': 27,  'name': 'Chassagne Montrachet', 'supplier': 'NOMAD', 'cost_price': 35.00, 'glasses': 4, 'margin': 70, 'stock': 2.0},
         # WINE MASON
-        {'name': 'German Riesling Wagner Stempel', 'supplier': 'WINE MASON', 'cost_price': 15.00, 'glasses': 4, 'margin': 70, 'stock': 6.25},  # 6 btl + 1 glass
-        {'name': 'Fleurie', 'supplier': 'WINE MASON', 'cost_price': 16.00, 'glasses': 5, 'margin': 70, 'stock': 5.0},
+        {'wine_number': 15,  'name': 'German Riesling Wagner Stempel', 'supplier': 'WINE MASON', 'cost_price': 15.00, 'glasses': 4, 'margin': 70, 'stock': 6.25},
+        {'wine_number': 70,  'name': 'Fleurie', 'supplier': 'WINE MASON', 'cost_price': 16.00, 'glasses': 5, 'margin': 70, 'stock': 5.0},
     ]
 
     alert_wines = ['Gevrey Chambertin', 'Champagne Dom Perignon']
@@ -255,6 +255,7 @@ def seed_wines(supplier_map):
             # Bump stock by 12 bottles so only the chosen alert_wines trigger low stock
             stock = w_data['stock'] if w_data['name'] in alert_wines else w_data['stock'] + 12
             wine = Wine(
+                wine_number=w_data.get('wine_number'),
                 name=w_data['name'],
                 supplier_id=supplier_map.get(w_data['supplier']),
                 cost_price=w_data['cost_price'],

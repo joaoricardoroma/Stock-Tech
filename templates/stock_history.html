@@ -192,10 +192,6 @@
     border-color: var(--glass-border-hover, rgba(255,255,255,0.15));
     transform: translateX(2px);
   }
-  .hist-event-row.ev-pending {
-    border-color: rgba(251,191,36,0.3);
-    background: rgba(251,191,36,0.04);
-  }
   .hist-event-row.ev-cleared {
     border-color: rgba(52,211,153,0.25);
     background: rgba(52,211,153,0.04);
@@ -215,11 +211,7 @@
     position: relative;
     z-index: 2;
   }
-  .hist-ev-icon.pending-icon {
-    background: rgba(107,114,128,0.15);
-    border-color: rgba(107,114,128,0.35);
-    color: #6b7280;
-  }
+
   .hist-ev-icon.cleared-icon {
     background: rgba(52,211,153,0.12);
     border-color: rgba(52,211,153,0.35);
@@ -338,11 +330,7 @@
     align-items: center;
     gap: 4px;
   }
-  .status-pending {
-    background: rgba(107,114,128,0.15);
-    color: #9ca3af;
-    border: 1px solid rgba(107,114,128,0.25);
-  }
+
   .status-cleared {
     background: rgba(52,211,153,0.12);
     color: #34d399;
@@ -531,16 +519,9 @@
     <i class="fas fa-list"></i> Total Events
     <span class="pill-count" id="pillTotal">0</span>
   </div>
+
   <div class="hist-summary-pill">
-    <i class="fas fa-clock" style="color:#9ca3af;"></i> Pending
-    <span class="pill-count" id="pillPending" style="background:rgba(107,114,128,0.15);color:#9ca3af;">0</span>
-  </div>
-  <div class="hist-summary-pill">
-    <i class="fas fa-check-circle" style="color:#34d399;"></i> Cleared
-    <span class="pill-count" id="pillCleared" style="background:rgba(52,211,153,0.12);color:#34d399;">0</span>
-  </div>
-  <div class="hist-summary-pill">
-    <i class="fas fa-plus-circle" style="color:#34d399;"></i> Purchases
+    <i class="fas fa-plus-circle" style="color:#34d399;"></i> Total Purchased
     <span class="pill-count" id="pillPurchases" style="background:rgba(52,211,153,0.12);color:#34d399;">0</span>
   </div>
   <div class="hist-summary-pill">
@@ -669,8 +650,6 @@ function renderSummary(events) {
   const row = document.getElementById('summaryRow');
   row.style.display = 'flex';
   document.getElementById('pillTotal').textContent = events.length;
-  document.getElementById('pillPending').textContent = events.filter(e => e.status === 'pending').length;
-  document.getElementById('pillCleared').textContent = events.filter(e => e.status === 'cleared').length;
   document.getElementById('pillPurchases').textContent = events.filter(e => e.type === 'purchase').length;
   document.getElementById('pillSales').textContent = events.filter(e => e.type === 'sale').length;
 }
@@ -727,13 +706,8 @@ function renderEventRow(ev) {
 
   let iconClass, rowClass;
   if (ev.type === 'purchase') {
-    if (ev.status === 'pending') {
-      iconClass = 'pending-icon';
-      rowClass = 'ev-pending';
-    } else {
-      iconClass = 'cleared-icon';
-      rowClass = 'ev-cleared';
-    }
+    iconClass = 'cleared-icon';
+    rowClass = 'ev-cleared';
   } else if (ev.type === 'sale') {
     iconClass = 'sale-icon'; rowClass = '';
   } else if (ev.type === 'comp') {
@@ -747,19 +721,13 @@ function renderEventRow(ev) {
   }
 
   const icon = ev.type === 'purchase'
-    ? (ev.status === 'pending' ? 'fa-clock' : 'fa-check-circle')
+    ? 'fa-check-circle'
     : ev.icon;
 
   let statusBadge = '';
   if (ev.type === 'purchase') {
-    if (ev.status === 'pending') {
-      statusBadge = `<span class="hist-status-badge status-pending"><i class="fas fa-clock"></i> Pending</span>`;
-    } else {
-      const cleared = ev.date_cleared ? ` · ${formatDatetime(ev.date_cleared)}` : '';
-      statusBadge = `<span class="hist-status-badge status-cleared"><i class="fas fa-check"></i> Cleared${cleared}</span>`;
-    }
-  } else if (ev.status === 'done') {
-    statusBadge = `<span class="hist-status-badge status-done"><i class="fas fa-check-double"></i> Done</span>`;
+    const cleared = ev.date_cleared ? ` · ${formatDatetime(ev.date_cleared)}` : '';
+    statusBadge = `<span class="hist-status-badge status-cleared"><i class="fas fa-check"></i> Purchased${cleared}</span>`;
   }
 
   return `

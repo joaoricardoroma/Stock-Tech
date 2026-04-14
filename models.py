@@ -65,6 +65,8 @@ class Wine(db.Model):
     __tablename__ = 'wines'
 
     id = db.Column(db.Integer, primary_key=True)
+    # wine_number: stable position number from the wine list (persists even when wine changes)
+    wine_number = db.Column(db.Integer, nullable=True)
     name = db.Column(db.String(200), nullable=False)
     supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
     cost_price = db.Column(db.Float, nullable=False, default=0.0)
@@ -124,7 +126,9 @@ class Wine(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'wine_number': self.wine_number,
             'name': self.name,
+            'display_name': f"{self.wine_number}. {self.name}" if self.wine_number else self.name,
             'supplier_id': self.supplier_id,
             'supplier_name': self.supplier.name if self.supplier else 'N/A',
             'cost_price': self.cost_price,
@@ -406,7 +410,7 @@ class SpiritSale(db.Model):
 class SpiritPurchase(db.Model):
     """
     Purchase order for spirit bottles.
-    Stock NOT added until invoice is cleared (same pattern as WinePurchase).
+    Stock added directly when recorded.
     """
     __tablename__ = 'spirit_purchases'
 
@@ -415,10 +419,6 @@ class SpiritPurchase(db.Model):
     date_ordered = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     bottles_ordered = db.Column(db.Integer, nullable=False, default=1)
     cost_per_bottle = db.Column(db.Float, nullable=True)     # actual invoice cost (may differ)
-    is_invoice_cleared = db.Column(db.Boolean, nullable=False, default=False)
-    date_cleared = db.Column(db.DateTime, nullable=True)
-    invoice_image_path = db.Column(db.Text, nullable=True)
-    invoice_image_original = db.Column(db.String(300), nullable=True)
     notes = db.Column(db.String(300), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -426,15 +426,11 @@ class SpiritPurchase(db.Model):
         return {
             'id': self.id,
             'spirit_id': self.spirit_id,
-            'spirit_name': self.spirit.name if self.spirit else 'N/A',
-            'date_ordered': self.date_ordered.isoformat(),
+            'spirit_name': getattr(self.spirit, 'name', 'N/A'),
             'bottles_ordered': self.bottles_ordered,
             'cost_per_bottle': self.cost_per_bottle,
-            'is_invoice_cleared': self.is_invoice_cleared,
-            'date_cleared': self.date_cleared.isoformat() if self.date_cleared else None,
-            'invoice_image_path': self.invoice_image_path,
-            'invoice_image_original': self.invoice_image_original,
-            'notes': self.notes,
+            'date_ordered': self.date_ordered.isoformat(),
+            'notes': self.notes
         }
 
 

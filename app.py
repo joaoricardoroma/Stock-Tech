@@ -8,14 +8,10 @@ Main app with routes, API endpoints, and authentication.
 
 import logging
 import os
-import io
 import uuid
-import base64
 from datetime import datetime, date, timedelta
 from functools import wraps
-from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
-from PIL import Image
 import json
 
 load_dotenv()
@@ -193,7 +189,11 @@ def wine_stock():
     except (ValueError, TypeError):
         week_offset = 0
 
-    wines = Wine.query.order_by(Wine.name).all()
+    wines = Wine.query.order_by(
+        Wine.wine_number.is_(None),  # numbered wines first, unnumbered last
+        Wine.wine_number,
+        Wine.name
+    ).all()
     suppliers = Supplier.query.order_by(Supplier.name).all()
 
     # --- Weekly Sales Data (Mon-Sun of selected week) ---
@@ -679,6 +679,7 @@ def update_wine(wine_id):
     data = request.get_json()
 
     wine.name = data.get('name', wine.name)
+    wine.wine_number = data.get('wine_number', wine.wine_number)
     wine.supplier_id = data.get('supplier_id', wine.supplier_id)
     wine.cost_price = float(data.get('cost_price', wine.cost_price))
     wine.wines_per_box = int(data.get('wines_per_box', wine.wines_per_box))
@@ -693,6 +694,24 @@ def update_wine(wine_id):
     return jsonify({'success': True, 'wine': wine.to_dict()})
 
 
+@app.route('/api/wine/<int:wine_id>', methods=['DELETE'])
+@login_required
+def delete_wine(wine_id):
+    """Delete a wine and all its associated sales, purchases, comps, and corked records."""
+    wine = Wine.query.get_or_404(wine_id)
+
+    # Delete all related records first
+    WineSale.query.filter_by(wine_id=wine_id).delete()
+    WinePurchase.query.filter_by(wine_id=wine_id).delete()
+    WineComp.query.filter_by(wine_id=wine_id).delete()
+    CorkedWine.query.filter_by(wine_id=wine_id).delete()
+
+    db.session.delete(wine)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': f'Wine deleted successfully'})
+
+
 @app.route('/api/wine', methods=['POST'])
 @login_required
 def add_wine():
@@ -700,6 +719,7 @@ def add_wine():
     data = request.get_json()
 
     wine = Wine(
+        wine_number=data.get('wine_number') or None,
         name=data['name'],
         supplier_id=data.get('supplier_id'),
         cost_price=float(data.get('cost_price', 0)),
@@ -804,9 +824,9 @@ def api_stock_history():
                 'unit': 'bottle' if p.quantity_ordered == 1 else 'bottles',
                 'price': f'€{w.cost_price:.2f}' if w else '—',
                 'price_raw': w.cost_price if w else 0,
-                'status': 'cleared' if p.is_invoice_cleared else 'pending',
-                'is_cleared': p.is_invoice_cleared,
-                'date_cleared': p.date_cleared.isoformat() if p.date_cleared else None,
+                'status': 'cleared',
+                'is_cleared': True,
+                'date_cleared': p.date_ordered.isoformat(),
                 'notes': f'Order of {p.quantity_ordered} bottles',
                 'icon': 'fa-plus-circle',
                 'color': '#34d399',
@@ -921,9 +941,9 @@ def api_stock_history():
                 'unit': 'bottle' if p.bottles_ordered == 1 else 'bottles',
                 'price': f'€{p.cost_per_bottle:.2f}' if p.cost_per_bottle else '—',
                 'price_raw': p.cost_per_bottle or 0,
-                'status': 'cleared' if p.is_invoice_cleared else 'pending',
-                'is_cleared': p.is_invoice_cleared,
-                'date_cleared': p.date_cleared.isoformat() if p.date_cleared else None,
+                'status': 'cleared',
+                'is_cleared': True,
+                'date_cleared': p.date_ordered.isoformat(),
                 'notes': p.notes or f'Order of {p.bottles_ordered} bottles',
                 'icon': 'fa-plus-circle',
                 'color': '#34d399',
@@ -1031,36 +1051,8 @@ def record_corked():
     if wine.current_stock_qty < quantity:
         return jsonify({'error': f'Insufficient stock (only {wine.stock_display} bottles)'}), 400
 
-    # Handle optional image upload
     image_path = None
     image_original = None
-    if 'corked_image' in request.files:
-        file = request.files['corked_image']
-        if file and file.filename and allowed_file(file.filename):
-            ext = file.filename.rsplit('.', 1)[1].lower()
-            is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
-            if is_image:
-                try:
-                    img = Image.open(file.stream)
-                    if img.mode not in ('RGB', 'L'):
-                        img = img.convert('RGB')
-                    if img.width > 1200:
-                        img = img.resize((1200, int(img.height * (1200 / img.width))), Image.LANCZOS)
-                    buffer = io.BytesIO()
-                    img.save(buffer, format='JPEG', quality=75, optimize=True)
-                    encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                    image_path = f"data:image/jpeg;base64,{encoded}"
-                except Exception:
-                    file.seek(0)
-                    encoded = base64.b64encode(file.read()).decode('utf-8')
-                    mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
-                    image_path = f"data:{mime};base64,{encoded}"
-            else:
-                file.seek(0)
-                encoded = base64.b64encode(file.read()).decode('utf-8')
-                mime = 'application/pdf' if ext == 'pdf' else f'application/{ext}'
-                image_path = f"data:{mime};base64,{encoded}"
-            image_original = secure_filename(file.filename)
 
     corked = CorkedWine(
         wine_id=int(wine_id),
@@ -1091,7 +1083,11 @@ def record_corked():
 @login_required
 def wine_stock_check():
     """Stock check page — Virtual vs Real comparison for wines."""
-    wines = Wine.query.order_by(Wine.name).all()
+    wines = Wine.query.order_by(
+        Wine.wine_number.is_(None),
+        Wine.wine_number,
+        Wine.name
+    ).all()
     return render_template('wine_check.html', wines=wines, today=date.today().isoformat())
 
 
@@ -1290,8 +1286,7 @@ def bar_stock():
                            .all())
         month_waste = BarWaste.query.filter(BarWaste.date >= first_of_month).all()
         month_purchases = SpiritPurchase.query.filter(
-            SpiritPurchase.date_ordered >= first_of_month,
-            SpiritPurchase.is_invoice_cleared == True
+            SpiritPurchase.date_ordered >= first_of_month
         ).all()
 
         total_revenue = sum((s.unit_price or 0) * s.quantity for s in month_bar_sales)
@@ -1328,7 +1323,6 @@ def bar_stock():
         cache.set('bar_kpis', kpis, timeout=600)
 
     low_stock_spirits = [s for s in spirits if s.is_below_threshold]
-    pending_purchases = SpiritPurchase.query.filter_by(is_invoice_cleared=False).all()
 
     # ── FIXED N+1: last sold date per spirit — 2 aggregate queries instead of N queries ──
     # 1. Direct shot sales grouped by spirit
@@ -1366,7 +1360,6 @@ def bar_stock():
                            sub_ingredients=sub_ingredients_data,
                            recipes=recipes_data,
                            weekly_data=weekly_data,
-                           pending_purchases=[p.to_dict() for p in pending_purchases],
                            low_stock_spirits=[s.to_dict() for s in low_stock_spirits],
                            kpis=kpis,
                            today=today.isoformat(),
@@ -1463,52 +1456,9 @@ def bar_record_purchase():
         notes=data.get('notes'),
     )
     db.session.add(purchase)
-    db.session.commit()
-    return jsonify({'success': True, 'purchase': purchase.to_dict()})
-
-
-@app.route('/api/bar/spirit/clear-invoice/<int:purchase_id>', methods=['POST'])
-@login_required
-def bar_clear_invoice(purchase_id):
-    purchase = SpiritPurchase.query.get_or_404(purchase_id)
-    if purchase.is_invoice_cleared:
-        return jsonify({'error': 'Invoice already cleared'}), 400
-    if 'invoice_image' not in request.files:
-        return jsonify({'error': 'Invoice image is required.'}), 400
-    file = request.files['invoice_image']
-    if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({'error': 'Please upload a valid image or PDF.'}), 400
-    ext = file.filename.rsplit('.', 1)[1].lower()
-    is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
-    if is_image:
-        try:
-            img = Image.open(file.stream)
-            if img.mode not in ('RGB', 'L'):
-                img = img.convert('RGB')
-            if img.width > 1200:
-                img = img.resize((1200, int(img.height * (1200 / img.width))), Image.LANCZOS)
-            buffer = io.BytesIO()
-            img.save(buffer, format='JPEG', quality=75, optimize=True)
-            encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            purchase.invoice_image_path = f"data:image/jpeg;base64,{encoded}"
-        except Exception:
-            file.seek(0)
-            encoded = base64.b64encode(file.read()).decode('utf-8')
-            mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
-            purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
-    else:
-        file.seek(0)
-        encoded = base64.b64encode(file.read()).decode('utf-8')
-        mime = 'application/pdf' if ext == 'pdf' else f'application/{ext}'
-        purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
-    purchase.invoice_image_original = secure_filename(file.filename)
-    purchase.is_invoice_cleared = True
-    purchase.date_cleared = datetime.utcnow()
-    # Add measures to spirit
-    spirit = Spirit.query.get(purchase.spirit_id)
     spirit.current_measures = round(spirit.current_measures + purchase.bottles_ordered * spirit.measures_per_bottle, 4)
     db.session.commit()
-    return jsonify({'success': True, 'spirit': spirit.to_dict(), 'purchase': purchase.to_dict()})
+    return jsonify({'success': True, 'purchase': purchase.to_dict()})
 
 
 # --- Bar Sale (cocktail or shot) ---
@@ -1735,8 +1685,7 @@ def bar_analysis():
              .filter(BarSale.date >= first_of_month).all())
     wastes = BarWaste.query.filter(BarWaste.date >= first_of_month).all()
     purchases = SpiritPurchase.query.filter(
-        SpiritPurchase.date_ordered >= first_of_month,
-        SpiritPurchase.is_invoice_cleared == True
+        SpiritPurchase.date_ordered >= first_of_month
     ).all()
 
     total_revenue = sum((s.unit_price or 0) * s.quantity for s in sales)
@@ -1793,26 +1742,7 @@ def init_db():
                 
                 is_postgres = str(db.engine.url).startswith('postgres')
                 
-                # Add invoice image columns to wine_purchases if missing
-                if 'wine_purchases' in inspector.get_table_names():
-                    cols = [c['name'] for c in inspector.get_columns('wine_purchases')]
-                    if 'invoice_image_path' not in cols:
-                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_path TEXT'))
-                    elif is_postgres:
-                        conn.execute(text('ALTER TABLE wine_purchases ALTER COLUMN invoice_image_path TYPE TEXT'))
-                    
-                    if 'invoice_image_original' not in cols:
-                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_original VARCHAR(300)'))
 
-                if 'spirit_purchases' in inspector.get_table_names():
-                    cols = [c['name'] for c in inspector.get_columns('spirit_purchases')]
-                    if 'invoice_image_path' not in cols:
-                        conn.execute(text('ALTER TABLE spirit_purchases ADD COLUMN invoice_image_path TEXT'))
-                    elif is_postgres:
-                        conn.execute(text('ALTER TABLE spirit_purchases ALTER COLUMN invoice_image_path TYPE TEXT'))
-                        
-                    if 'invoice_image_original' not in cols:
-                        conn.execute(text('ALTER TABLE spirit_purchases ADD COLUMN invoice_image_original VARCHAR(300)'))
 
                 if 'corked_wines' in inspector.get_table_names():
                     cols = [c['name'] for c in inspector.get_columns('corked_wines')]

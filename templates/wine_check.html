@@ -158,6 +158,7 @@
   <table class="check-table" id="checkTable">
     <thead>
       <tr>
+        <th style="width:52px; text-align:center;">#</th>
         <th>Wine Name</th>
         <th class="th-center">Virtual (DB)</th>
         <th class="th-center">Real Stock</th>
@@ -167,9 +168,12 @@
     <tbody>
       {% for wine in wines %}
       <tr id="checkRow{{ wine.id }}" data-wine-id="{{ wine.id }}" data-virtual="{{ wine.current_stock_qty | round(2) }}">
+        <td style="text-align:center; font-weight:700; color:var(--accent-gold); font-size:0.85rem;">
+          {% if wine.wine_number %}#{{ wine.wine_number }}{% else %}<span style="color:var(--text-muted)">—</span>{% endif %}
+        </td>
         <td class="td-name">
           <span class="wine-dot {% if wine.current_stock_qty < wine.minimum_stock_threshold %}dot-red{% elif wine.current_stock_qty <= wine.minimum_stock_threshold + 2 %}dot-amber{% else %}dot-green{% endif %}"></span>
-          {{ wine.name }}
+          {% if wine.wine_number %}<span style="color:var(--accent-gold);font-weight:700;margin-right:3px;">{{ wine.wine_number }}.</span>{% endif %}{{ wine.name }}
         </td>
         <td class="td-virtual">{{ wine.stock_display }}</td>
         <td class="td-real">
