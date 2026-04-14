@@ -148,9 +148,11 @@ class WineSale(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     wine_id = db.Column(db.Integer, db.ForeignKey('wines.id'), nullable=False)
     date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    quantity_sold = db.Column(db.Integer, nullable=False, default=1)
-    # 'glass' or 'bottle' — determines stock deduction per unit
+    quantity_sold = db.Column(db.Float, nullable=False, default=1)  # Float to support fractional pairing quantities
+    # 'glass', 'bottle', or 'pairing' — determines stock deduction per unit
     sale_type = db.Column(db.String(10), nullable=False, default='bottle')
+    # Groups multiple WineSale rows that belong to a single Pairing event
+    pairing_group_id = db.Column(db.String(36), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -164,6 +166,45 @@ class WineSale(db.Model):
             'date': self.date.isoformat(),
             'quantity_sold': self.quantity_sold,
             'sale_type': self.sale_type,
+            'pairing_group_id': self.pairing_group_id,
+        }
+
+
+class CorkedWine(db.Model):
+    """
+    Record of a corked (spoiled/unusable) wine bottle.
+    DEDUCTS from Wine.current_stock_qty immediately.
+    Shown in red on the supplier card.
+    """
+    __tablename__ = 'corked_wines'
+
+    id = db.Column(db.Integer, primary_key=True)
+    wine_id = db.Column(db.Integer, db.ForeignKey('wines.id'), nullable=False)
+    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    image_path = db.Column(db.Text, nullable=True)       # optional photo (base64 string)
+    image_original = db.Column(db.String(300), nullable=True)
+    notes = db.Column(db.String(300), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    wine = db.relationship('Wine', backref='corked_records', foreign_keys=[wine_id])
+    supplier = db.relationship('Supplier', backref='corked_wines', foreign_keys=[supplier_id])
+
+    def __repr__(self):
+        return f'<CorkedWine {self.wine.name if self.wine else "?"} x{self.quantity} on {self.date}>'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'wine_id': self.wine_id,
+            'wine_name': self.wine.name if self.wine else 'N/A',
+            'supplier_id': self.supplier_id,
+            'supplier_name': self.supplier.name if self.supplier else 'N/A',
+            'quantity': self.quantity,
+            'date': self.date.isoformat(),
+            'image_path': self.image_path,
+            'notes': self.notes,
         }
 
 
@@ -376,7 +417,7 @@ class SpiritPurchase(db.Model):
     cost_per_bottle = db.Column(db.Float, nullable=True)     # actual invoice cost (may differ)
     is_invoice_cleared = db.Column(db.Boolean, nullable=False, default=False)
     date_cleared = db.Column(db.DateTime, nullable=True)
-    invoice_image_path = db.Column(db.String(500), nullable=True)
+    invoice_image_path = db.Column(db.Text, nullable=True)
     invoice_image_original = db.Column(db.String(300), nullable=True)
     notes = db.Column(db.String(300), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

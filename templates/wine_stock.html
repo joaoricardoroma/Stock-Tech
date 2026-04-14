@@ -29,6 +29,10 @@
         <button class="btn-glass" onclick="openModal('addPurchaseModal')" id="btnRecordPurchase">
             <i class="fas fa-plus-circle" style="color: var(--accent-green);"></i> Record Purchase
         </button>
+        <button class="btn-glass" onclick="openModal('addCorkedModal')" id="btnAddCorked"
+                style="border-color: rgba(231,76,60,0.4); color: var(--accent-red);">
+            <i class="fas fa-wine-bottle" style="color: var(--accent-red);"></i> Corked Wine
+        </button>
         <button class="btn-glass" onclick="openModal('addSupplierModal')" id="btnAddSupplier">
             <i class="fas fa-truck" style="color: var(--accent-gold);"></i> Add Supplier
         </button>
@@ -197,7 +201,7 @@
                     </span>
                 </div>
                 <div class="alert-qty-needed">
-                    Order: <strong>{{ wine.minimum_stock_threshold - wine.current_stock_qty|int + 6 }}</strong>
+                    Order: <strong>{{ wine.minimum_stock_threshold }}</strong>
                 </div>
             </div>
             <div class="alert-card-bottom">
@@ -299,10 +303,29 @@
             </span>
             Wine Database
         </h2>
-        <div class="table-search-wrapper">
-            <i class="fas fa-search"></i>
-            <input type="text" class="table-search-input" placeholder="Search database..."
-                   oninput="filterWineTable(this.value)" id="wineTableSearch">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="table-search-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="text" class="table-search-input" placeholder="Search database..."
+                       oninput="filterWineTable(this.value)" id="wineTableSearch">
+            </div>
+            <a href="{{ url_for('stock_history') }}?category=wine" class="btn-glass" id="btnWineHistory"
+               style="display:flex;align-items:center;gap:7px;padding:8px 14px;text-decoration:none;
+                      border-color:rgba(212,164,74,0.4);color:var(--accent-gold);white-space:nowrap;"
+               title="View wine stock history log">
+                <i class="fas fa-clock-rotate-left"></i> Log History
+            </a>
+            <button class="btn-glass" onclick="downloadWineDatabasePDF()" id="btnDownloadWineDB"
+                    style="display:flex;align-items:center;gap:7px;padding:8px 14px;
+                           border-color:rgba(231,76,60,0.4);color:var(--accent-red);white-space:nowrap;"
+                    title="Download wine database as PDF">
+                <i class="fas fa-file-pdf"></i> Download PDF
+            </button>
+            <a href="{{ url_for('wine_stock_check') }}" class="btn-glass" id="btnCheckWineStock"
+               style="display:flex;align-items:center;gap:8px;padding:8px 18px;text-decoration:none;
+                      border-color:rgba(46,204,113,0.4);color:var(--accent-green);">
+                <i class="fas fa-clipboard-check"></i> Check Stock
+            </a>
         </div>
     </div>
 
@@ -508,9 +531,10 @@ function toggleStockBreakdown() {
 
             <div class="supplier-wines-list">
                 {% set supplier_wines = wines | selectattr('supplier_name', 'equalto', supplier.name) | list %}
-                {% if supplier_wines %}
+                {% set supplier_corked = corked_by_supplier.get(supplier.id, []) %}
+                {% if supplier_wines or supplier_corked %}
                 <div class="wines-list-header" onclick="this.parentElement.classList.toggle('expanded')">
-                    <span><i class="fas fa-wine-bottle"></i> {{ supplier_wines | length }} Wines</span>
+                    <span><i class="fas fa-wine-bottle"></i> {{ supplier_wines | length }} Wine{{ 's' if supplier_wines | length != 1 else '' }}</span>
                     <i class="fas fa-chevron-down"></i>
                 </div>
                 <div class="wines-list-items">
@@ -521,6 +545,28 @@ function toggleStockBreakdown() {
                         <span class="wine-list-qty">{{ wine.stock_display }}</span>
                     </div>
                     {% endfor %}
+                    {% if supplier_corked %}
+                    <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(231,76,60,0.2);">
+                        <div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent-red);font-weight:700;margin-bottom:6px;">
+                            <i class="fas fa-exclamation-circle"></i> Corked
+                        </div>
+                        {% for corked in supplier_corked[:5] %}
+                        <div class="wine-list-item" style="color:var(--accent-red);opacity:0.9;flex-direction:column;align-items:flex-start;gap:2px;">
+                            <div style="display:flex;align-items:center;width:100%;">
+                                <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-red);display:inline-block;margin-right:7px;flex-shrink:0;"></span>
+                                {{ corked.wine_name }}
+                                <span class="wine-list-qty" style="color:var(--accent-red);margin-left:auto;">-{{ corked.quantity }}bt</span>
+                            </div>
+                            <div style="font-size:0.72rem;color:rgba(231,76,60,0.7);padding-left:15px;">
+                                <i class="fas fa-calendar-alt" style="margin-right:3px;"></i>{{ corked.date }}{% if corked.notes %} · {{ corked.notes[:30] }}{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if supplier_corked | length > 5 %}
+                        <div style="font-size:0.78rem;color:var(--text-muted);padding:4px 6px;">+{{ supplier_corked | length - 5 }} more corked</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% else %}
                 <div class="wines-list-header">
@@ -565,12 +611,32 @@ function toggleStockBreakdown() {
                     <button class="sale-type-btn" id="saleBtnGlass" onclick="setSaleType('glass')">
                         <i class="fas fa-wine-glass"></i> Glass
                     </button>
+                    <button class="sale-type-btn" id="saleBtnPairing" onclick="setSaleType('pairing')">
+                        <i class="fas fa-utensils"></i> Pairing
+                    </button>
                 </div>
             </div>
-            <div class="form-group-modal">
+            <!-- Standard qty (hidden for pairing) -->
+            <div class="form-group-modal" id="standardSaleQtyGroup">
                 <label id="saleQtyLabel">Quantity (Bottles)</label>
                 <input type="number" id="saleQuantity" class="modal-input" value="1" min="1">
                 <div class="sale-stock-hint" id="saleStockHint"></div>
+            </div>
+
+            <!-- Pairing items (shown only when Pairing is selected) -->
+            <div id="pairingSection" style="display:none;">
+                <label style="font-size:0.82rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-wine-glass" style="color:var(--accent-gold);"></i>
+                    Pairing Wines <span style="font-weight:400;text-transform:none;font-size:0.78rem;">— enter number of glasses per wine</span>
+                </label>
+                <div id="pairingRows" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;"></div>
+                <button type="button" onclick="addPairingRow()" id="btnAddPairingRow"
+                        style="margin-top:10px;padding:7px 16px;background:rgba(255,255,255,0.06);border:1.5px dashed var(--border-color);
+                               border-radius:10px;color:var(--text-muted);font-size:0.83rem;cursor:pointer;width:100%;transition:all 0.2s;"
+                        onmouseover="this.style.borderColor='var(--accent-gold)';this.style.color='var(--accent-gold)'"
+                        onmouseout="this.style.borderColor='var(--border-color)';this.style.color='var(--text-muted)'">
+                    <i class="fas fa-plus"></i> Add Wine to Pairing
+                </button>
             </div>
             <div class="form-group-modal">
                 <label>Date</label>
@@ -864,6 +930,72 @@ document.addEventListener('DOMContentLoaded', () => {
 <script id="weeklyCompsDataJSON" type="application/json">{{ weekly_comps_data | tojson | safe }}</script>
 <script id="weekOffsetJSON" type="application/json">{{ week_offset | tojson | safe }}</script>
 <script id="weekLabelJSON" type="application/json">{{ week_label | tojson | safe }}</script>
+<script id="winesDataJSON" type="application/json">{{ wines | tojson | safe }}</script>
+<script id="suppliersDataJSON" type="application/json">{{ suppliers | map(attribute='id') | list | tojson | safe }}</script>
+
+<!-- ================================================================== -->
+<!-- ADD CORKED WINE MODAL                                              -->
+<!-- ================================================================== -->
+<div class="modal-overlay" id="addCorkedModal">
+    <div class="modal-glass">
+        <div class="modal-header">
+            <h3><i class="fas fa-wine-bottle" style="color:var(--accent-red);"></i> Add Corked Wine</h3>
+            <button class="modal-close" onclick="closeModal('addCorkedModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group-modal">
+                <label>Wine</label>
+                <select id="corkedWineSelect" class="modal-input">
+                    {% for wine in wines %}
+                    <option value="{{ wine.id }}">{{ wine.name }} (Stock: {{ wine.stock_display }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group-modal">
+                <label>Supplier</label>
+                <select id="corkedSupplierSelect" class="modal-input">
+                    <option value="">-- No Supplier --</option>
+                    {% for supplier in suppliers %}
+                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group-modal">
+                <label>Quantity (Bottles)</label>
+                <input type="number" id="corkedQuantity" class="modal-input" value="1" min="1">
+            </div>
+            <div class="form-group-modal">
+                <label>Date</label>
+                <input type="date" id="corkedDate" class="modal-input" value="{{ today }}">
+            </div>
+            <div class="form-group-modal">
+                <label>Notes (optional)</label>
+                <input type="text" id="corkedNotes" class="modal-input" placeholder="e.g. Cork fault, musty smell">
+            </div>
+            <div class="form-group-modal">
+                <label>Photo (optional)</label>
+                <div style="position:relative;">
+                    <div class="invoice-upload-zone" id="corkedUploadZone" onclick="document.getElementById('corkedImageInput').click()" style="cursor:pointer;">
+                        <div class="upload-placeholder" id="corkedUploadPlaceholder" style="display:flex;flex-direction:column;align-items:center;padding:18px;gap:8px;">
+                            <i class="fas fa-camera" style="font-size:28px;color:var(--accent-gold);"></i>
+                            <span style="font-size:0.82rem;color:var(--text-muted);">Tap to add photo (optional)</span>
+                        </div>
+                        <img id="corkedImagePreview" src="" alt="Corked bottle" style="display:none;max-width:100%;max-height:180px;border-radius:10px;object-fit:contain;">
+                    </div>
+                    <input type="file" id="corkedImageInput" accept="image/*" capture="environment" style="display:none;"
+                           onchange="previewCorkedImage(this)">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-glass" onclick="closeModal('addCorkedModal')">Cancel</button>
+            <button class="btn-accent" onclick="submitCorkedWine()" id="submitCorkedBtn"
+                    style="background:linear-gradient(135deg,var(--accent-red),#c0392b);">
+                <i class="fas fa-wine-bottle"></i> Record Corked Wine
+            </button>
+        </div>
+    </div>
+</div>
 
 <script src="{{ url_for('static', filename='js/wine_stock.js') }}"></script>
 {% endblock %}

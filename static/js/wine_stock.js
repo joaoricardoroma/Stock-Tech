@@ -15,6 +15,8 @@ const weeklyCompsData = JSON.parse(
 );
 const weekOffset = JSON.parse(document.getElementById('weekOffsetJSON').textContent);
 const weekLabel  = JSON.parse(document.getElementById('weekLabelJSON').textContent);
+// Wine price map {id: {name, retail_price, glasses_per_bottle}}
+const winesData  = JSON.parse(document.getElementById('winesDataJSON').textContent);
 
 // ===================================================================
 // Day Card Interactions (Sales)
@@ -138,12 +140,16 @@ function toggleCompDayDetail(card, index) {
                 ? `<span class="sale-type-mini glass-mini"><i class="fas fa-wine-glass"></i>${d.glasses}gl</span>` : '';
             const bottleBadge = d.bottles > 0
                 ? `<span class="sale-type-mini bottle-mini"><i class="fas fa-wine-bottle"></i>${d.bottles}bt</span>` : '';
+            const costBadge = (d.cost && d.cost > 0)
+                ? `<span class="sale-type-mini" style="background:rgba(212,164,74,0.15);color:var(--accent-gold);">
+                       <i class="fas fa-euro-sign"></i>${d.cost.toFixed(2)}
+                   </span>` : '';
             return `
             <div class="day-wine-item">
                 <span class="day-wine-name">${name}</span>
                 <div class="day-wine-stats">
                     <span class="day-wine-comp"><i class="fas fa-gift"></i> ${d.total} comp${d.total !== 1 ? 's' : ''}</span>
-                    ${glassBadge}${bottleBadge}
+                    ${glassBadge}${bottleBadge}${costBadge}
                 </div>
             </div>
         `}).join('');
@@ -282,7 +288,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ===================================================================
-// Sale Type Toggle (Glass / Bottle)
+// Sale Type Toggle (Glass / Bottle / Pairing)
 // ===================================================================
 let currentSaleType = 'bottle';
 
@@ -290,9 +296,83 @@ function setSaleType(type) {
     currentSaleType = type;
     document.getElementById('saleBtnBottle').classList.toggle('active', type === 'bottle');
     document.getElementById('saleBtnGlass').classList.toggle('active', type === 'glass');
-    document.getElementById('saleQtyLabel').textContent =
-        type === 'glass' ? 'Quantity (Glasses)' : 'Quantity (Bottles)';
+    document.getElementById('saleBtnPairing').classList.toggle('active', type === 'pairing');
+
+    const standardGroup = document.getElementById('standardSaleQtyGroup');
+    const pairingSection = document.getElementById('pairingSection');
+    const wineSelectGroup = document.getElementById('saleWineSelect').closest('.form-group-modal');
+
+    if (type === 'pairing') {
+        standardGroup.style.display = 'none';
+        pairingSection.style.display = 'block';
+        wineSelectGroup.style.display = 'none';
+        // Init with one row if empty
+        if (document.getElementById('pairingRows').children.length === 0) {
+            addPairingRow();
+        }
+    } else {
+        standardGroup.style.display = 'block';
+        pairingSection.style.display = 'none';
+        wineSelectGroup.style.display = 'block';
+        document.getElementById('saleQtyLabel').textContent =
+            type === 'glass' ? 'Quantity (Glasses)' : 'Quantity (Bottles)';
+    }
     updateSaleStockInfo();
+}
+
+// ===================================================================
+// Pairing Rows
+// ===================================================================
+let pairingRowCount = 0;
+
+function addPairingRow() {
+    const container = document.getElementById('pairingRows');
+    const rowId = `pr_${pairingRowCount++}`;
+    const wineOptions = winesData.map(w =>
+        `<option value="${w.id}">${w.name} (Stock: ${w.stock_display})</option>`
+    ).join('');
+
+    const div = document.createElement('div');
+    div.id = rowId;
+    div.style.cssText = 'display:flex;gap:8px;align-items:center;';
+    div.innerHTML = `
+        <select class="modal-input pairing-wine-sel" style="flex:2;" data-row="${rowId}">
+            ${wineOptions}
+        </select>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+            <label style="font-size:0.7rem;color:var(--text-muted);display:flex;align-items:center;gap:4px;white-space:nowrap;">
+                <i class="fas fa-wine-glass" style="color:var(--accent-gold);"></i> glasses
+            </label>
+            <input type="number" class="modal-input pairing-qty-inp" min="0.25" step="0.25" value="1"
+                   placeholder="e.g. 0.5" data-row="${rowId}" title="Number of glasses (e.g. 0.5 = half glass)"
+                   style="padding:7px 10px;text-align:center;">
+        </div>
+        <button type="button" onclick="removePairingRow('${rowId}')"
+                style="flex-shrink:0;width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+                       background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);border-radius:8px;
+                       color:var(--accent-red);cursor:pointer;font-size:14px;align-self:flex-end;">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(div);
+}
+
+function removePairingRow(rowId) {
+    const el = document.getElementById(rowId);
+    if (el) el.remove();
+}
+
+function getPairingItems() {
+    const rows = document.querySelectorAll('#pairingRows > div');
+    const items = [];
+    rows.forEach(row => {
+        const wineId = row.querySelector('.pairing-wine-sel')?.value;
+        const qty = parseFloat(row.querySelector('.pairing-qty-inp')?.value || 0);
+        if (wineId && qty > 0) {
+            items.push({ wine_id: parseInt(wineId), quantity_glasses: qty });
+        }
+    });
+    return items;
 }
 
 function updateSaleStockInfo() {
@@ -331,9 +411,36 @@ function setCompType(type) {
 // ===================================================================
 
 async function submitSale() {
+    const saleDate = document.getElementById('saleDate').value;
+
+    if (currentSaleType === 'pairing') {
+        const items = getPairingItems();
+        if (items.length === 0) {
+            showToast('Add at least one wine to the pairing.', 'warning');
+            return;
+        }
+        try {
+            const resp = await fetch('/api/wine/sale', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sale_type: 'pairing', date: saleDate, items })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast(`Pairing recorded! ${items.length} wine(s) deducted.`, 'success');
+                closeModal('addSaleModal');
+                setTimeout(() => location.reload(), 1200);
+            } else {
+                showToast(data.error || 'Failed to record pairing', 'danger');
+            }
+        } catch (err) {
+            showToast('Network error', 'danger');
+        }
+        return;
+    }
+
     const wineId = document.getElementById('saleWineSelect').value;
     const quantity = parseInt(document.getElementById('saleQuantity').value);
-    const saleDate = document.getElementById('saleDate').value;
 
     try {
         const resp = await fetch('/api/wine/sale', {
@@ -398,6 +505,71 @@ async function submitComp() {
         btn.innerHTML = '<i class="fas fa-gift"></i> Record Comp';
     }
 }
+
+// ===================================================================
+// Corked Wine
+// ===================================================================
+function previewCorkedImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const preview = document.getElementById('corkedImagePreview');
+    const placeholder = document.getElementById('corkedUploadPlaceholder');
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        placeholder.innerHTML = `<i class="fas fa-file" style="font-size:28px;color:var(--accent-gold);"></i><span style="font-size:0.82rem;color:var(--text-muted);">${file.name}</span>`;
+    }
+}
+
+async function submitCorkedWine() {
+    const wineId = document.getElementById('corkedWineSelect').value;
+    const supplierId = document.getElementById('corkedSupplierSelect').value;
+    const quantity = document.getElementById('corkedQuantity').value;
+    const date = document.getElementById('corkedDate').value;
+    const notes = document.getElementById('corkedNotes').value;
+    const imageInput = document.getElementById('corkedImageInput');
+    const btn = document.getElementById('submitCorkedBtn');
+
+    if (!wineId) { showToast('Please select a wine.', 'warning'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recording...';
+
+    const formData = new FormData();
+    formData.append('wine_id', wineId);
+    if (supplierId) formData.append('supplier_id', supplierId);
+    formData.append('quantity', quantity);
+    formData.append('date', date);
+    if (notes) formData.append('notes', notes);
+    if (imageInput.files[0]) {
+        formData.append('corked_image', imageInput.files[0]);
+    }
+
+    try {
+        const resp = await fetch('/api/wine/corked', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.success) {
+            showToast(`Corked wine recorded! Stock updated to ${data.stock_display}.`, 'success');
+            closeModal('addCorkedModal');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showToast(data.error || 'Failed to record corked wine', 'danger');
+        }
+    } catch (err) {
+        showToast('Network error', 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-wine-bottle"></i> Record Corked Wine';
+    }
+}
+
+
 
 async function submitPurchase() {
     const wineId = document.getElementById('purchaseWineSelect').value;
@@ -702,10 +874,11 @@ async function downloadWeeklyPDF() {
         const allComps = {};
         weeklyCompsData.forEach(day => {
             Object.entries(day.comp_details || {}).forEach(([name, vals]) => {
-                if (!allComps[name]) allComps[name] = { total: 0, glasses: 0, bottles: 0 };
-                allComps[name].total += vals.total;
+                if (!allComps[name]) allComps[name] = { total: 0, glasses: 0, bottles: 0, cost: 0 };
+                allComps[name].total   += vals.total;
                 allComps[name].glasses += (vals.glasses || 0);
                 allComps[name].bottles += (vals.bottles || 0);
+                allComps[name].cost    += (vals.cost    || 0);
             });
         });
         const compList = Object.entries(allComps).sort(([,a],[,b]) => b.total - a.total).filter(([,v]) => v.total > 0);
@@ -720,30 +893,47 @@ async function downloadWeeklyPDF() {
             y += 8;
 
             doc.setFillColor(40, 20, 60);
-            doc.rect(14, y, 135, 8, 'F');
+            doc.rect(14, y, 160, 8, 'F');
             doc.setFontSize(9);
             doc.setTextColor(180, 120, 255);
             doc.text('Wine Name', 16, y + 5.5);
-            doc.text('Total Comps', 86, y + 5.5);
-            doc.text('Glasses', 111, y + 5.5);
-            doc.text('Bottles', 131, y + 5.5);
+            doc.text('Total', 86, y + 5.5);
+            doc.text('Glasses', 106, y + 5.5);
+            doc.text('Bottles', 126, y + 5.5);
+            doc.text('Est. Cost \u20ac', 146, y + 5.5);
             y += 8;
 
             compList.forEach(([name, vals], idx) => {
                 if (y > 188) { doc.addPage(); y = 20; }
                 doc.setFillColor(idx % 2 === 0 ? 25 : 32, idx % 2 === 0 ? 15 : 20, idx % 2 === 0 ? 40 : 50);
-                doc.rect(14, y, 135, 7, 'F');
+                doc.rect(14, y, 160, 7, 'F');
                 doc.setFont('helvetica', 'normal');
                 doc.setFontSize(8.5);
                 doc.setTextColor(220, 220, 220);
                 doc.text(name.length > 35 ? name.substring(0,33)+'...' : name, 16, y + 4.8);
                 doc.setTextColor(160, 100, 220);
-                doc.text(String(vals.total), 86, y + 4.8);
+                doc.text(String(vals.total), 87, y + 4.8);
                 doc.setTextColor(180, 130, 240);
-                doc.text(String(vals.glasses), 111, y + 4.8);
-                doc.text(String(vals.bottles), 131, y + 4.8);
+                doc.text(String(vals.glasses), 107, y + 4.8);
+                doc.text(String(vals.bottles), 127, y + 4.8);
+                doc.setTextColor(212, 164, 74);
+                const cost = vals.cost || 0;
+                doc.text(`\u20ac${cost.toFixed(2)}`, 147, y + 4.8);
                 y += 7;
             });
+
+            // Weekly comp total cost
+            const totalCompCost = compList.reduce((sum, [, v]) => sum + (v.cost || 0), 0);
+            if (totalCompCost > 0) {
+                doc.setFillColor(50, 30, 70);
+                doc.rect(14, y, 160, 7, 'F');
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8.5);
+                doc.setTextColor(212, 164, 74);
+                doc.text('TOTAL COMP COST', 16, y + 4.8);
+                doc.text(`\u20ac${totalCompCost.toFixed(2)}`, 147, y + 4.8);
+                y += 7;
+            }
         }
 
         // Footer
@@ -879,10 +1069,11 @@ async function downloadMonthlyPDF() {
             const weekCompDetails = {};
             week.days.forEach(day => {
                 Object.entries(day.comp_details || {}).forEach(([name, vals]) => {
-                    if (!weekCompDetails[name]) weekCompDetails[name] = { total: 0, glasses: 0, bottles: 0 };
+                    if (!weekCompDetails[name]) weekCompDetails[name] = { total: 0, glasses: 0, bottles: 0, cost: 0 };
                     weekCompDetails[name].total += vals.total;
                     weekCompDetails[name].glasses += (vals.glasses || 0);
                     weekCompDetails[name].bottles += (vals.bottles || 0);
+                    weekCompDetails[name].cost += (vals.cost || 0);
                 });
             });
             const weekCompList = Object.entries(weekCompDetails).filter(([,v]) => v.total > 0);
@@ -900,7 +1091,8 @@ async function downloadMonthlyPDF() {
                     doc.setFontSize(8.5);
                     doc.setTextColor(180, 130, 240);
                     const shortName = name.length > 30 ? name.substring(0,28)+'...' : name;
-                    doc.text(`${shortName}: ${vals.total} total (${vals.glasses}gl + ${vals.bottles}bt)`, 18, y);
+                    const costStr = vals.cost > 0 ? ` — \u20ac${vals.cost.toFixed(2)}` : '';
+                    doc.text(`${shortName}: ${vals.total} total (${vals.glasses}gl + ${vals.bottles}bt)${costStr}`, 18, y);
                     y += 6;
                 });
             }
@@ -917,8 +1109,8 @@ async function downloadMonthlyPDF() {
         doc.text(`Wine Performance — ${data.month_label}`, 14, 14);
         y = 30;
 
-        const wCols = ['Wine Name', 'Sold', 'Comps', 'Revenue \u20ac', 'Profit \u20ac', 'Stock'];
-        const wColW = [82, 22, 22, 34, 34, 30];
+        const wCols = ['Wine Name', 'Sold', 'Comps', 'Comp \u20ac', 'Revenue \u20ac', 'Profit \u20ac', 'Stock'];
+        const wColW = [68, 20, 20, 24, 30, 30, 26];
         doc.setFillColor(30, 30, 50);
         doc.rect(14, y, pageW - 28, 8, 'F');
         doc.setFontSize(9);
@@ -936,6 +1128,7 @@ async function downloadMonthlyPDF() {
                 wine.name.length > 40 ? wine.name.substring(0,38)+'...' : wine.name,
                 String(wine.sold),
                 String(wine.comps || 0),
+                `\u20ac${(wine.comp_cost || 0).toFixed(2)}`,
                 wine.revenue.toFixed(2),
                 wine.profit.toFixed(2),
                 String(wine.current_stock)
@@ -945,8 +1138,9 @@ async function downloadMonthlyPDF() {
                 doc.setFontSize(8.5);
                 if (i === 1) doc.setTextColor(46, 204, 113);
                 else if (i === 2) doc.setTextColor(160, 100, 220);
-                else if (i === 3) doc.setTextColor(91, 141, 239);
-                else if (i === 4) doc.setTextColor(idx === 0 ? 212 : 180, 164, idx === 0 ? 74 : 160);
+                else if (i === 3) doc.setTextColor(212, 164, 74);
+                else if (i === 4) doc.setTextColor(91, 141, 239);
+                else if (i === 5) doc.setTextColor(idx === 0 ? 212 : 180, 164, idx === 0 ? 74 : 160);
                 else doc.setTextColor(210, 210, 210);
                 doc.text(val, x + 2, y + 4.8);
                 x += wColW[i];
@@ -1084,3 +1278,121 @@ document.addEventListener('DOMContentLoaded', () => {
         document.head.appendChild(style);
     }
 });
+
+// ===================================================================
+// Wine Database PDF Download
+// ===================================================================
+function downloadWineDatabasePDF() {
+    const btn = document.getElementById('btnDownloadWineDB');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        const today = new Date().toLocaleDateString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric'
+        });
+
+        // Header
+        doc.setFillColor(7, 7, 13);
+        doc.rect(0, 0, pageW, 28, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor(212, 164, 74);
+        doc.text('StockTech', 14, 12);
+        doc.setFontSize(11);
+        doc.setTextColor(200, 200, 200);
+        doc.text('Wine Database', 14, 21);
+        doc.setFontSize(9);
+        doc.setTextColor(140, 140, 140);
+        doc.text(`Generated: ${today}`, pageW - 14, 21, { align: 'right' });
+
+        let y = 36;
+
+        // Table header
+        const cols = ['Wine Name', 'Supplier', 'Cost', 'Glasses/Btl', 'Margin%', 'NET VAT', 'Retail', 'Stock'];
+        const colW = [72, 42, 20, 22, 18, 20, 20, 16];
+        doc.setFillColor(30, 30, 50);
+        doc.rect(14, y, pageW - 28, 8, 'F');
+        let x = 14;
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(212, 164, 74);
+        cols.forEach((col, i) => {
+            doc.text(col, x + 2, y + 5.5);
+            x += colW[i];
+        });
+        y += 8;
+
+        // Table rows from current table (includes any search filter in DOM)
+        const rows = document.querySelectorAll('#wineTableBody tr:not(.hidden-row)');
+        rows.forEach((row, idx) => {
+            if (y > 185) { doc.addPage(); y = 20; }
+            const cells = row.querySelectorAll('td');
+            const isLow = cells[8] && cells[8].querySelector('.stock-num-critical');
+
+            doc.setFillColor(idx % 2 === 0 ? 20 : 26, idx % 2 === 0 ? 20 : 26, idx % 2 === 0 ? 34 : 42);
+            doc.rect(14, y, pageW - 28, 8, 'F');
+
+            if (isLow) {
+                doc.setFillColor(70, 20, 20);
+                doc.rect(14, y, 3, 8, 'F');
+            }
+
+            const vals = [
+                cells[0]?.textContent.trim().replace(/^[●○]/,'').trim() || '',  // Name
+                cells[4]?.textContent.trim() || '',  // Supplier
+                cells[1]?.textContent.trim() || '',  // Cost
+                cells[2]?.textContent.trim() || '',  // Glasses
+                cells[5]?.textContent.trim() || '',  // Margin
+                cells[6]?.textContent.trim() || '',  // NET VAT
+                cells[7]?.textContent.trim() || '',  // Retail
+                cells[8]?.textContent.trim() || '',  // Stock
+            ];
+
+            x = 14;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            vals.forEach((val, i) => {
+                const maxLen = Math.floor(colW[i] / 2.2);
+                const txt = val.length > maxLen ? val.substring(0, maxLen - 1) + '…' : val;
+                if (i === 7 && isLow) {
+                    doc.setTextColor(251, 113, 133);
+                } else if (i === 7) {
+                    doc.setTextColor(52, 211, 153);
+                } else if (i === 0) {
+                    doc.setTextColor(230, 230, 230);
+                    doc.setFont('helvetica', 'bold');
+                } else {
+                    doc.setTextColor(170, 170, 170);
+                    doc.setFont('helvetica', 'normal');
+                }
+                doc.text(txt, x + 2, y + 5);
+                x += colW[i];
+            });
+            y += 8;
+        });
+
+        // Footer
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(80, 80, 80);
+            doc.text('StockTech — Confidential', 14, 200);
+            doc.text(`Page ${i} of ${pageCount}`, pageW - 14, 200, { align: 'right' });
+        }
+
+        const filename = `wine_database_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(filename);
+        showToast('Wine database PDF downloaded!', 'success');
+    } catch (err) {
+        showToast('PDF generation failed: ' + err.message, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-file-pdf"></i> Download PDF';
+    }
+}

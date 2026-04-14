@@ -10,27 +10,34 @@ import logging
 import os
 import io
 import uuid
+import base64
 from datetime import datetime, date, timedelta
 from functools import wraps
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from PIL import Image
+import json
 
 load_dotenv()
 
 from flask import (
     Flask, render_template, request, jsonify, redirect,
-    url_for, flash, session
+    url_for, flash, session, send_from_directory
 )
 from flask_login import (
     LoginManager, login_user, logout_user,
     login_required, current_user
 )
 from flask_caching import Cache
+try:
+    from flask_compress import Compress
+    _compress_available = True
+except ImportError:
+    _compress_available = False
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import joinedload, selectinload
 
-from models import (db, User, Supplier, Wine, WineSale, WinePurchase, WineComp,
+from models import (db, User, Supplier, Wine, WineSale, WinePurchase, WineComp, CorkedWine,
                      Spirit, SpiritSale, SpiritPurchase, SubIngredient,
                      CocktailRecipe, CocktailIngredient, BarSale, BarWaste)
 
@@ -48,19 +55,52 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
+_is_sqlite = _db_url.startswith('sqlite')
+_is_serverless = os.environ.get('VERCEL') == '1'  # Vercel sets VERCEL=1
+
+if _is_serverless:
+    # NullPool: no persistent connections in serverless — each request connects & disconnects.
+    # This prevents exhausting Neon's ~20 connection free-tier limit across Lambda invocations.
+    from sqlalchemy.pool import NullPool
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'poolclass': NullPool,
+        'pool_pre_ping': True,
+    }
+elif _is_sqlite:
+    # SQLite: minimal options, no pool tuning needed
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
+else:
+    # Traditional server (local gunicorn, etc): keep a small pool
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': 3,
+        'max_overflow': 5,
+    }
 
 # Invoice image upload config
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'invoices')
+if _is_serverless:
+    UPLOAD_FOLDER = '/tmp/uploads/invoices'
+else:
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'invoices')
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'webp', 'heic'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600  # 1-hour browser cache for static assets
+
+try:
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+except OSError as e:
+    import logging
+    logging.warning(f"Could not create upload folder {UPLOAD_FOLDER}: {e}")
 
 db.init_app(app)
+if _compress_available:
+    Compress(app)  # gzip all responses automatically (saves ~70% bandwidth on JSON & HTML)
 
 # ---------------------------------------------------------------------------
 # Cache — SimpleCache (in-process, single worker)
@@ -79,6 +119,15 @@ from sqlalchemy import event as sa_event
 @sa_event.listens_for(db.session, 'after_commit')
 def _clear_cache_on_commit(session):
     cache.clear()
+
+@app.route('/static/uploads/invoices/<path:filename>')
+def serve_uploads(filename):
+    """Serve uploaded invoices specifically from /tmp on Vercel so they don't break"""
+    if _is_serverless:
+        from flask import send_from_directory
+        return send_from_directory('/tmp/uploads/invoices', filename)
+    from flask import send_from_directory
+    return send_from_directory(os.path.join(app.root_path, 'static', 'uploads', 'invoices'), filename)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -206,13 +255,21 @@ def wine_stock():
         comp_details = {}
         for c in day_comps:
             wname = c.wine.name if c.wine else 'Unknown'  # already in identity map
+            wine_obj = c.wine
             if wname not in comp_details:
-                comp_details[wname] = {'total': 0, 'glasses': 0, 'bottles': 0, 'wine_id': c.wine_id}
+                comp_details[wname] = {'total': 0, 'glasses': 0, 'bottles': 0, 'wine_id': c.wine_id, 'cost': 0.0}
             comp_details[wname]['total'] += c.quantity
             if c.sale_type == 'glass':
                 comp_details[wname]['glasses'] += c.quantity
+                if wine_obj:
+                    gpb = wine_obj.glasses_per_bottle or 1
+                    comp_details[wname]['cost'] = round(
+                        comp_details[wname]['cost'] + (wine_obj.cost_price / gpb) * c.quantity, 2)
             else:
                 comp_details[wname]['bottles'] += c.quantity
+                if wine_obj:
+                    comp_details[wname]['cost'] = round(
+                        comp_details[wname]['cost'] + wine_obj.cost_price * c.quantity, 2)
 
         weekly_data.append({
             'day_name': day_names[i],
@@ -279,6 +336,15 @@ def wine_stock():
 
     week_comps_total = sum(d['total_comps'] for d in weekly_comps_data)
 
+    # Get corked wines per supplier for display
+    corked_by_supplier = {}
+    recent_corked = CorkedWine.query.order_by(CorkedWine.date.desc()).limit(200).all()
+    for c in recent_corked:
+        sid = c.supplier_id
+        if sid not in corked_by_supplier:
+            corked_by_supplier[sid] = []
+        corked_by_supplier[sid].append(c.to_dict())
+
     return render_template('wine_stock.html',
                            wines=wines_data,
                            suppliers=suppliers,
@@ -289,7 +355,8 @@ def wine_stock():
                            kpis=kpis,
                            today=today.isoformat(),
                            week_offset=week_offset,
-                           week_label=week_label)
+                           week_label=week_label,
+                           corked_by_supplier=corked_by_supplier)
 
 
 
@@ -300,16 +367,43 @@ def wine_stock():
 @app.route('/api/wine/sale', methods=['POST'])
 @login_required
 def record_sale():
-    """Record a wine sale (glass or bottle)."""
+    """Record a wine sale (glass, bottle, or pairing)."""
     data = request.get_json()
+    sale_date_str = data.get('date', date.today().isoformat())
+    sale_date = datetime.strptime(sale_date_str, '%Y-%m-%d').date()
+    sale_type = data.get('sale_type', 'bottle')
+
+    if sale_type == 'pairing':
+        items = data.get('items', [])
+        if not items:
+            return jsonify({'error': 'No items provided for pairing'}), 400
+        pairing_id = str(uuid.uuid4())
+        results = []
+        for item in items:
+            wine = Wine.query.get_or_404(item['wine_id'])
+            qty_glasses = float(item.get('quantity_glasses', 1))
+            gpb = wine.glasses_per_bottle if wine.glasses_per_bottle else 1
+            deduction = qty_glasses / gpb
+            if wine.current_stock_qty < deduction:
+                return jsonify({'error': f'Insufficient stock for {wine.name}'}), 400
+            sale = WineSale(
+                wine_id=wine.id,
+                quantity_sold=qty_glasses,
+                sale_type='pairing',
+                pairing_group_id=pairing_id,
+                date=sale_date
+            )
+            wine.current_stock_qty = round(wine.current_stock_qty - deduction, 4)
+            db.session.add(sale)
+            results.append({'wine': wine.name, 'deduction': round(deduction, 4)})
+        db.session.commit()
+        return jsonify({'success': True, 'pairing_id': pairing_id, 'items': results})
+
+    # Standard glass or bottle sale
     wine_id = data.get('wine_id')
     quantity = data.get('quantity', 1)
-    sale_date = data.get('date', date.today().isoformat())
-    sale_type = data.get('sale_type', 'bottle')  # 'glass' or 'bottle'
-
     wine = Wine.query.get_or_404(wine_id)
 
-    # Calculate stock deduction
     if sale_type == 'glass':
         gpb = wine.glasses_per_bottle if wine.glasses_per_bottle else 1
         deduction = quantity / gpb
@@ -323,7 +417,7 @@ def record_sale():
         wine_id=wine_id,
         quantity_sold=quantity,
         sale_type=sale_type,
-        date=datetime.strptime(sale_date, '%Y-%m-%d').date()
+        date=sale_date
     )
     wine.current_stock_qty = round(wine.current_stock_qty - deduction, 4)
     db.session.add(sale)
@@ -473,13 +567,19 @@ def monthly_report_data():
 
             comp_details = {}
             for c in d_comps:
-                wn = c.wine.name if c.wine else 'Unknown'  # already in identity map
-                comp_details.setdefault(wn, {'total': 0, 'glasses': 0, 'bottles': 0})
+                wn = c.wine.name if c.wine else 'Unknown'
+                wine_obj = c.wine
+                comp_details.setdefault(wn, {'total': 0, 'glasses': 0, 'bottles': 0, 'cost': 0.0})
                 comp_details[wn]['total'] += c.quantity
                 if c.sale_type == 'glass':
                     comp_details[wn]['glasses'] += c.quantity
+                    if wine_obj:
+                        gpb = wine_obj.glasses_per_bottle or 1
+                        comp_details[wn]['cost'] += round((wine_obj.cost_price / gpb) * c.quantity, 2)
                 else:
                     comp_details[wn]['bottles'] += c.quantity
+                    if wine_obj:
+                        comp_details[wn]['cost'] += round(wine_obj.cost_price * c.quantity, 2)
 
             days.append({
                 'date': d.isoformat(),
@@ -527,11 +627,21 @@ def monthly_report_data():
                 cost += wine.cost_price * s.quantity_sold
         total_revenue_all += revenue
 
+        # Compute comp cost (actual cost to the restaurant — cost_price after VAT, not retail)
+        comp_cost = 0.0
+        gpb = wine.glasses_per_bottle or 1
+        for c in w_comps:
+            if c.sale_type == 'glass':
+                comp_cost += (wine.cost_price / gpb) * c.quantity
+            else:
+                comp_cost += wine.cost_price * c.quantity
+
         if sold_qty > 0 or ordered > 0 or comps_qty > 0:
             wine_summary.append({
                 'name': wine.name,
                 'sold': sold_qty,
                 'comps': comps_qty,
+                'comp_cost': round(comp_cost, 2),
                 'ordered': ordered,
                 'revenue': round(revenue, 2),
                 'profit': round(revenue - cost, 2),
@@ -642,6 +752,456 @@ def weekly_sales_api():
     ).all()
 
     return jsonify([s.to_dict() for s in sales])
+
+
+# ---------------------------------------------------------------------------
+# Stock History Routes
+# ---------------------------------------------------------------------------
+
+@app.route('/stock-history')
+@login_required
+def stock_history():
+    """Stock history log page."""
+    return render_template('stock_history.html', today=date.today().isoformat())
+
+
+@app.route('/api/stock-history')
+@login_required
+def api_stock_history():
+    """Return all stock change events for wine and bar, paginated and filterable."""
+    from_date_str = request.args.get('from_date')
+    to_date_str = request.args.get('to_date')
+    category = request.args.get('category', 'all')  # all, wine, bar
+    event_type = request.args.get('event_type', 'all')  # all, purchase, sale, comp, corked, waste
+    page = max(1, int(request.args.get('page', 1)))
+    per_page = 100
+
+    try:
+        from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date() if from_date_str else None
+        to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date() if to_date_str else None
+    except ValueError:
+        from_date = to_date = None
+
+    events = []
+
+    # ---- WINE PURCHASES ----
+    if category in ('all', 'wine') and event_type in ('all', 'purchase'):
+        q = WinePurchase.query.options(joinedload(WinePurchase.wine))
+        if from_date:
+            q = q.filter(WinePurchase.date_ordered >= from_date)
+        if to_date:
+            q = q.filter(WinePurchase.date_ordered <= to_date)
+        for p in q.all():
+            w = p.wine
+            events.append({
+                'id': f'wp-{p.id}',
+                'type': 'purchase',
+                'category': 'wine',
+                'name': w.name if w else 'Unknown',
+                'date': p.date_ordered.isoformat(),
+                'quantity': f'+{p.quantity_ordered}',
+                'quantity_raw': p.quantity_ordered,
+                'unit': 'bottle' if p.quantity_ordered == 1 else 'bottles',
+                'price': f'€{w.cost_price:.2f}' if w else '—',
+                'price_raw': w.cost_price if w else 0,
+                'status': 'cleared' if p.is_invoice_cleared else 'pending',
+                'is_cleared': p.is_invoice_cleared,
+                'date_cleared': p.date_cleared.isoformat() if p.date_cleared else None,
+                'notes': f'Order of {p.quantity_ordered} bottles',
+                'icon': 'fa-plus-circle',
+                'color': '#34d399',
+                'order_group_id': str(p.id),
+            })
+
+    # ---- WINE SALES ----
+    if category in ('all', 'wine') and event_type in ('all', 'sale'):
+        q = WineSale.query.options(joinedload(WineSale.wine))
+        if from_date:
+            q = q.filter(WineSale.date >= from_date)
+        if to_date:
+            q = q.filter(WineSale.date <= to_date)
+        for s in q.all():
+            w = s.wine
+            qty_label = f'-{s.quantity_sold}g' if s.sale_type == 'glass' else f'-{s.quantity_sold}b'
+            events.append({
+                'id': f'ws-{s.id}',
+                'type': 'sale',
+                'category': 'wine',
+                'name': w.name if w else 'Unknown',
+                'date': s.date.isoformat(),
+                'quantity': qty_label,
+                'quantity_raw': -s.quantity_sold,
+                'unit': s.sale_type,
+                'price': f'€{w.retail_price:.2f}' if w and w.retail_price else '—',
+                'price_raw': w.retail_price if w and w.retail_price else 0,
+                'status': 'done',
+                'is_cleared': True,
+                'date_cleared': None,
+                'notes': f'{s.sale_type.capitalize()} sale',
+                'icon': 'fa-minus-circle',
+                'color': '#fb7185',
+                'order_group_id': s.pairing_group_id,
+            })
+
+    # ---- WINE COMPS ----
+    if category in ('all', 'wine') and event_type in ('all', 'comp'):
+        q = WineComp.query.options(joinedload(WineComp.wine))
+        if from_date:
+            q = q.filter(WineComp.date >= from_date)
+        if to_date:
+            q = q.filter(WineComp.date <= to_date)
+        for c in q.all():
+            w = c.wine
+            events.append({
+                'id': f'wc-{c.id}',
+                'type': 'comp',
+                'category': 'wine',
+                'name': w.name if w else 'Unknown',
+                'date': c.date.isoformat(),
+                'quantity': f'-{c.quantity}',
+                'quantity_raw': -c.quantity,
+                'unit': c.sale_type,
+                'price': '€0',
+                'price_raw': 0,
+                'status': 'done',
+                'is_cleared': True,
+                'date_cleared': None,
+                'notes': f'Complimentary {c.sale_type}',
+                'icon': 'fa-gift',
+                'color': '#a78bfa',
+                'order_group_id': None,
+            })
+
+    # ---- WINE CORKED ----
+    if category in ('all', 'wine') and event_type in ('all', 'corked'):
+        q = CorkedWine.query.options(joinedload(CorkedWine.wine))
+        if from_date:
+            q = q.filter(CorkedWine.date >= from_date)
+        if to_date:
+            q = q.filter(CorkedWine.date <= to_date)
+        for c in q.all():
+            w = c.wine
+            events.append({
+                'id': f'cw-{c.id}',
+                'type': 'corked',
+                'category': 'wine',
+                'name': w.name if w else 'Unknown',
+                'date': c.date.isoformat(),
+                'quantity': f'-{c.quantity}',
+                'quantity_raw': -c.quantity,
+                'unit': 'bottle',
+                'price': f'€{w.cost_price * c.quantity:.2f}' if w else '—',
+                'price_raw': w.cost_price * c.quantity if w else 0,
+                'status': 'done',
+                'is_cleared': True,
+                'date_cleared': None,
+                'notes': c.notes or 'Corked / spoiled',
+                'icon': 'fa-ban',
+                'color': '#ef4444',
+                'order_group_id': None,
+            })
+
+    # ---- BAR PURCHASES (Spirit) ----
+    if category in ('all', 'bar') and event_type in ('all', 'purchase'):
+        q = SpiritPurchase.query.options(joinedload(SpiritPurchase.spirit))
+        if from_date:
+            q = q.filter(SpiritPurchase.date_ordered >= from_date)
+        if to_date:
+            q = q.filter(SpiritPurchase.date_ordered <= to_date)
+        for p in q.all():
+            s = p.spirit
+            events.append({
+                'id': f'sp-{p.id}',
+                'type': 'purchase',
+                'category': 'bar',
+                'name': s.name if s else 'Unknown',
+                'date': p.date_ordered.isoformat(),
+                'quantity': f'+{p.bottles_ordered}',
+                'quantity_raw': p.bottles_ordered,
+                'unit': 'bottle' if p.bottles_ordered == 1 else 'bottles',
+                'price': f'€{p.cost_per_bottle:.2f}' if p.cost_per_bottle else '—',
+                'price_raw': p.cost_per_bottle or 0,
+                'status': 'cleared' if p.is_invoice_cleared else 'pending',
+                'is_cleared': p.is_invoice_cleared,
+                'date_cleared': p.date_cleared.isoformat() if p.date_cleared else None,
+                'notes': p.notes or f'Order of {p.bottles_ordered} bottles',
+                'icon': 'fa-plus-circle',
+                'color': '#34d399',
+                'order_group_id': str(p.id),
+            })
+
+    # ---- BAR SALES ----
+    if category in ('all', 'bar') and event_type in ('all', 'sale'):
+        q = BarSale.query.options(joinedload(BarSale.cocktail), joinedload(BarSale.spirit))
+        if from_date:
+            q = q.filter(BarSale.date >= from_date)
+        if to_date:
+            q = q.filter(BarSale.date <= to_date)
+        for s in q.all():
+            name = s.cocktail.name if s.sale_type == 'cocktail' and s.cocktail else (s.spirit.name if s.spirit else 'Unknown')
+            events.append({
+                'id': f'bs-{s.id}',
+                'type': 'sale',
+                'category': 'bar',
+                'name': name,
+                'date': s.date.isoformat(),
+                'quantity': f'-{s.quantity}',
+                'quantity_raw': -s.quantity,
+                'unit': s.sale_type,
+                'price': f'€{s.unit_price:.2f}' if s.unit_price else '—',
+                'price_raw': s.unit_price or 0,
+                'status': 'done',
+                'is_cleared': True,
+                'date_cleared': None,
+                'notes': f'{s.sale_type.capitalize()} sale',
+                'icon': 'fa-cocktail',
+                'color': '#fb7185',
+                'order_group_id': None,
+            })
+
+    # ---- BAR WASTE ----
+    if category in ('all', 'bar') and event_type in ('all', 'waste'):
+        q = BarWaste.query.options(
+            joinedload(BarWaste.spirit),
+            joinedload(BarWaste.sub_ingredient),
+        )
+        if from_date:
+            q = q.filter(BarWaste.date >= from_date)
+        if to_date:
+            q = q.filter(BarWaste.date <= to_date)
+        for w in q.all():
+            name = 'Unknown'
+            if w.waste_type == 'spirit' and w.spirit:
+                name = w.spirit.name
+            elif w.waste_type == 'sub_ingredient' and w.sub_ingredient:
+                name = w.sub_ingredient.name
+            events.append({
+                'id': f'bw-{w.id}',
+                'type': 'waste',
+                'category': 'bar',
+                'name': name,
+                'date': w.date.isoformat(),
+                'quantity': f'-{w.quantity}',
+                'quantity_raw': -w.quantity,
+                'unit': 'measures',
+                'price': f'€{w.cost_impact:.2f}' if w.cost_impact else '—',
+                'price_raw': w.cost_impact or 0,
+                'status': 'done',
+                'is_cleared': True,
+                'date_cleared': None,
+                'notes': w.reason or 'Waste / spillage',
+                'icon': 'fa-trash',
+                'color': '#fbbf24',
+                'order_group_id': None,
+            })
+
+    # Sort by date descending
+    events.sort(key=lambda x: x['date'], reverse=True)
+
+    # Pagination
+    total = len(events)
+    start = (page - 1) * per_page
+    end = start + per_page
+
+    return jsonify({
+        'events': events[start:end],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'pages': max(1, (total + per_page - 1) // per_page),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Corked Wine Route
+# ---------------------------------------------------------------------------
+
+@app.route('/api/wine/corked', methods=['POST'])
+@login_required
+def record_corked():
+    """Record a corked (spoiled) wine bottle. Deducts from stock immediately."""
+    supplier_id = request.form.get('supplier_id') or None
+    wine_id = request.form.get('wine_id')
+    quantity = int(request.form.get('quantity', 1))
+    corked_date = request.form.get('date', date.today().isoformat())
+    notes = request.form.get('notes', '').strip()
+
+    wine = Wine.query.get_or_404(wine_id)
+
+    if wine.current_stock_qty < quantity:
+        return jsonify({'error': f'Insufficient stock (only {wine.stock_display} bottles)'}), 400
+
+    # Handle optional image upload
+    image_path = None
+    image_original = None
+    if 'corked_image' in request.files:
+        file = request.files['corked_image']
+        if file and file.filename and allowed_file(file.filename):
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
+            if is_image:
+                try:
+                    img = Image.open(file.stream)
+                    if img.mode not in ('RGB', 'L'):
+                        img = img.convert('RGB')
+                    if img.width > 1200:
+                        img = img.resize((1200, int(img.height * (1200 / img.width))), Image.LANCZOS)
+                    buffer = io.BytesIO()
+                    img.save(buffer, format='JPEG', quality=75, optimize=True)
+                    encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                    image_path = f"data:image/jpeg;base64,{encoded}"
+                except Exception:
+                    file.seek(0)
+                    encoded = base64.b64encode(file.read()).decode('utf-8')
+                    mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
+                    image_path = f"data:{mime};base64,{encoded}"
+            else:
+                file.seek(0)
+                encoded = base64.b64encode(file.read()).decode('utf-8')
+                mime = 'application/pdf' if ext == 'pdf' else f'application/{ext}'
+                image_path = f"data:{mime};base64,{encoded}"
+            image_original = secure_filename(file.filename)
+
+    corked = CorkedWine(
+        wine_id=int(wine_id),
+        supplier_id=int(supplier_id) if supplier_id else None,
+        quantity=quantity,
+        date=datetime.strptime(corked_date, '%Y-%m-%d').date(),
+        image_path=image_path,
+        image_original=image_original,
+        notes=notes,
+    )
+    wine.current_stock_qty = round(wine.current_stock_qty - quantity, 4)
+    db.session.add(corked)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'new_stock': wine.current_stock_qty,
+        'stock_display': wine.stock_display,
+        'corked': corked.to_dict()
+    })
+
+
+# ---------------------------------------------------------------------------
+# Wine Stock Check Routes
+# ---------------------------------------------------------------------------
+
+@app.route('/wine-stock/check')
+@login_required
+def wine_stock_check():
+    """Stock check page — Virtual vs Real comparison for wines."""
+    wines = Wine.query.order_by(Wine.name).all()
+    return render_template('wine_check.html', wines=wines, today=date.today().isoformat())
+
+
+@app.route('/api/wine/stock-check', methods=['POST'])
+@login_required
+def submit_wine_stock_check():
+    """
+    Accept {items: [{wine_id, real_qty}]}, update DB where different,
+    return discrepancy list.
+    """
+    data = request.get_json()
+    items = data.get('items', [])
+    discrepancies = []
+
+    # Bulk-load all wines referenced in a single query (eliminates N+1)
+    wine_ids = [item['wine_id'] for item in items if item.get('wine_id')]
+    wines_map = {w.id: w for w in Wine.query.filter(Wine.id.in_(wine_ids)).all()} if wine_ids else {}
+
+    for item in items:
+        wine = wines_map.get(item['wine_id'])
+        if not wine:
+            continue
+        real_qty = float(item['real_qty'])
+        virtual_qty = round(wine.current_stock_qty, 2)
+        diff = round(real_qty - virtual_qty, 2)
+        if abs(diff) > 0.0001:
+            discrepancies.append({
+                'wine_name': wine.name,
+                'virtual_qty': virtual_qty,
+                'real_qty': real_qty,
+                'difference': diff,
+            })
+        wine.current_stock_qty = round(real_qty, 4)
+
+    db.session.commit()
+    return jsonify({'success': True, 'discrepancies': discrepancies})
+
+
+# ---------------------------------------------------------------------------
+# Bar Stock Check Routes
+# ---------------------------------------------------------------------------
+
+@app.route('/bar/check')
+@login_required
+def bar_stock_check():
+    """Stock check page — Virtual vs Real comparison for bar spirits and sub-ingredients."""
+    spirits = Spirit.query.order_by(Spirit.category, Spirit.name).all()
+    sub_ingredients = SubIngredient.query.order_by(SubIngredient.category, SubIngredient.name).all()
+    return render_template('bar_check.html',
+                           spirits=spirits,
+                           sub_ingredients=sub_ingredients,
+                           today=date.today().isoformat())
+
+
+@app.route('/api/bar/stock-check', methods=['POST'])
+@login_required
+def submit_bar_stock_check():
+    """
+    Accept {spirits: [{spirit_id, real_bottles}], sub_ingredients: [{id, real_stock}]},
+    update DB where different, return discrepancy list.
+    """
+    data = request.get_json()
+    discrepancies = []
+
+    # Bulk-load all spirits and sub-ingredients referenced (eliminates N+1)
+    spirit_ids = [i['spirit_id'] for i in data.get('spirits', []) if i.get('spirit_id')]
+    spirits_map = {s.id: s for s in Spirit.query.filter(Spirit.id.in_(spirit_ids)).all()} if spirit_ids else {}
+
+    sub_ids = [i['sub_ingredient_id'] for i in data.get('sub_ingredients', []) if i.get('sub_ingredient_id')]
+    subs_map = {s.id: s for s in SubIngredient.query.filter(SubIngredient.id.in_(sub_ids)).all()} if sub_ids else {}
+
+    for item in data.get('spirits', []):
+        spirit = spirits_map.get(item['spirit_id'])
+        if not spirit:
+            continue
+        real_bottles = float(item['real_bottles'])
+        virtual_bottles = round(spirit.bottles_remaining, 2)
+        diff = round(real_bottles - virtual_bottles, 2)
+        if abs(diff) > 0.0001:
+            discrepancies.append({
+                'type': 'spirit',
+                'name': spirit.name,
+                'virtual_qty': virtual_bottles,
+                'real_qty': real_bottles,
+                'difference': diff,
+                'unit': 'bottles',
+            })
+        # Convert real bottles back to measures and store
+        spirit.current_measures = round(real_bottles * spirit.measures_per_bottle, 4)
+
+    for item in data.get('sub_ingredients', []):
+        sub = subs_map.get(item['sub_ingredient_id'])
+        if not sub:
+            continue
+        real_stock = float(item['real_stock'])
+        virtual_stock = round(sub.current_stock, 2)
+        diff = round(real_stock - virtual_stock, 2)
+        if abs(diff) > 0.0001:
+            discrepancies.append({
+                'type': 'sub_ingredient',
+                'name': sub.name,
+                'virtual_qty': virtual_stock,
+                'real_qty': real_stock,
+                'difference': diff,
+                'unit': sub.unit,
+            })
+        sub.current_stock = round(real_stock, 4)
+
+    db.session.commit()
+    return jsonify({'success': True, 'discrepancies': discrepancies})
 
 
 # ---------------------------------------------------------------------------
@@ -921,23 +1481,26 @@ def bar_clear_invoice(purchase_id):
     ext = file.filename.rsplit('.', 1)[1].lower()
     is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
     if is_image:
-        unique_name = f"bar_invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.jpg"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
         try:
             img = Image.open(file.stream)
             if img.mode not in ('RGB', 'L'):
                 img = img.convert('RGB')
             if img.width > 1200:
-                ratio = 1200 / img.width
-                img = img.resize((1200, int(img.height * ratio)), Image.LANCZOS)
-            img.save(save_path, format='JPEG', quality=75, optimize=True)
+                img = img.resize((1200, int(img.height * (1200 / img.width))), Image.LANCZOS)
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=75, optimize=True)
+            encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            purchase.invoice_image_path = f"data:image/jpeg;base64,{encoded}"
         except Exception:
-            file.seek(0); file.save(save_path)
+            file.seek(0)
+            encoded = base64.b64encode(file.read()).decode('utf-8')
+            mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
+            purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
     else:
-        unique_name = f"bar_invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.{ext}"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        file.save(save_path)
-    purchase.invoice_image_path = f"uploads/invoices/{unique_name}"
+        file.seek(0)
+        encoded = base64.b64encode(file.read()).decode('utf-8')
+        mime = 'application/pdf' if ext == 'pdf' else f'application/{ext}'
+        purchase.invoice_image_path = f"data:{mime};base64,{encoded}"
     purchase.invoice_image_original = secure_filename(file.filename)
     purchase.is_invoice_cleared = True
     purchase.date_cleared = datetime.utcnow()
@@ -1217,19 +1780,83 @@ def init_db():
     with app.app_context():
         db.create_all()
 
-        # Create admin user
-        if not User.query.filter_by(username='Admin').first():
+        # Auto-migrate missing columns for Vercel/Neon DB that db.create_all() misses on existing tables
+        try:
+            from sqlalchemy import text, inspect
+            inspector = inspect(db.engine)
+            with db.engine.connect() as conn:
+                # Add pairing_group_id to wine_sales if missing (Fixes 500 Error on Vercel)
+                if 'wine_sales' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('wine_sales')]
+                    if 'pairing_group_id' not in cols:
+                        conn.execute(text('ALTER TABLE wine_sales ADD COLUMN pairing_group_id VARCHAR(36)'))
+                
+                is_postgres = str(db.engine.url).startswith('postgres')
+                
+                # Add invoice image columns to wine_purchases if missing
+                if 'wine_purchases' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('wine_purchases')]
+                    if 'invoice_image_path' not in cols:
+                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_path TEXT'))
+                    elif is_postgres:
+                        conn.execute(text('ALTER TABLE wine_purchases ALTER COLUMN invoice_image_path TYPE TEXT'))
+                    
+                    if 'invoice_image_original' not in cols:
+                        conn.execute(text('ALTER TABLE wine_purchases ADD COLUMN invoice_image_original VARCHAR(300)'))
+
+                if 'spirit_purchases' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('spirit_purchases')]
+                    if 'invoice_image_path' not in cols:
+                        conn.execute(text('ALTER TABLE spirit_purchases ADD COLUMN invoice_image_path TEXT'))
+                    elif is_postgres:
+                        conn.execute(text('ALTER TABLE spirit_purchases ALTER COLUMN invoice_image_path TYPE TEXT'))
+                        
+                    if 'invoice_image_original' not in cols:
+                        conn.execute(text('ALTER TABLE spirit_purchases ADD COLUMN invoice_image_original VARCHAR(300)'))
+
+                if 'corked_wines' in inspector.get_table_names():
+                    cols = [c['name'] for c in inspector.get_columns('corked_wines')]
+                    if 'image_path' in cols and is_postgres:
+                        conn.execute(text('ALTER TABLE corked_wines ALTER COLUMN image_path TYPE TEXT'))
+                
+                conn.commit()
+        except Exception as e:
+            import logging
+            logging.error(f"Auto-migration failed: {e}")
+
+        # Create Pearl user (primary account)
+        existing = User.query.filter_by(username='Pearl').first()
+        old_admin = User.query.filter_by(username='Admin').first()
+
+        if existing:
+            # Update password if Pearl already exists
+            existing.password_hash = generate_password_hash('Pearl2000')
+            db.session.commit()
+            print("✓ Pearl user updated (Pearl / Pearl2000)")
+        elif old_admin:
+            # Migrate old Admin account to Pearl
+            old_admin.username = 'Pearl'
+            old_admin.password_hash = generate_password_hash('Pearl2000')
+            db.session.commit()
+            print("✓ Admin user migrated → Pearl (Pearl / Pearl2000)")
+        else:
             admin = User(
-                username='Admin',
-                password_hash=generate_password_hash('123')
+                username='Pearl',
+                password_hash=generate_password_hash('Pearl2000')
             )
             db.session.add(admin)
             db.session.commit()
-            print("✓ Admin user created (Admin / 123)")
-        else:
-            print("✓ Admin user already exists")
+            print("✓ Pearl user created (Pearl / Pearl2000)")
 
+
+# ---------------------------------------------------------------------------
+# Run DB init on every cold start (covers both local & Vercel serverless)
+# ---------------------------------------------------------------------------
+try:
+    init_db()
+except Exception as _init_err:
+    import logging as _log
+    _log.warning(f"init_db() skipped at import time: {_init_err}")
 
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
