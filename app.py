@@ -235,8 +235,6 @@ def wine_stock():
             'comp_details': comp_details,
         })
 
-    # --- Pending Purchases (not yet cleared) ---
-    pending_purchases = WinePurchase.query.filter_by(is_invoice_cleared=False).all()
 
     # --- Low Stock Alerts ---
     low_stock_wines = [w for w in wines if w.is_below_threshold]
@@ -247,48 +245,9 @@ def wine_stock():
         total_stock_value = sum(w.stock_value for w in wines)
         total_cost_spent = sum(w.cost_price * w.current_stock_qty for w in wines)
 
-        # Eager-load .wine so revenue loop has no hidden queries
-        month_sales = (WineSale.query
-                       .options(joinedload(WineSale.wine))
-                       .filter(WineSale.date >= first_of_month)
-                       .all())
-
-        total_revenue = 0.0
-        total_cost_of_sold = 0.0
-        wine_sales_count = {}
-        wine_margin_data = {}
-
-        for sale in month_sales:
-            wine = sale.wine  # already loaded — zero extra queries
-            if wine:
-                if sale.sale_type == 'glass':
-                    gpb = wine.glasses_per_bottle or 1
-                    unit_price = (wine.retail_price or 0) / gpb
-                    unit_cost = wine.cost_price / gpb
-                else:
-                    unit_price = wine.retail_price or 0
-                    unit_cost = wine.cost_price
-                total_revenue += unit_price * sale.quantity_sold
-                total_cost_of_sold += unit_cost * sale.quantity_sold
-                wine_sales_count[wine.name] = wine_sales_count.get(wine.name, 0) + sale.quantity_sold
-                if wine.name not in wine_margin_data:
-                    wine_margin_data[wine.name] = wine.target_margin_percent or 0
-
-        total_profit = round(total_revenue - total_cost_of_sold, 2)
-        top_wine = max(wine_sales_count, key=wine_sales_count.get) if wine_sales_count else 'N/A'
-        top_wine_qty = wine_sales_count.get(top_wine, 0) if top_wine != 'N/A' else 0
-        highest_margin_wine = max(wine_margin_data, key=wine_margin_data.get) if wine_margin_data else 'N/A'
-        highest_margin_pct = wine_margin_data.get(highest_margin_wine, 0) if highest_margin_wine != 'N/A' else 0
-
         kpis = {
             'total_stock_value': round(total_stock_value, 2),
             'total_cost_spent': round(total_cost_spent, 2),
-            'total_profit': total_profit,
-            'total_revenue': round(total_revenue, 2),
-            'top_wine': top_wine,
-            'top_wine_qty': top_wine_qty,
-            'highest_margin_wine': highest_margin_wine,
-            'highest_margin_pct': round(highest_margin_pct, 1),
             'low_stock_count': len(low_stock_wines),
             'total_wines': len(wines),
         }
@@ -309,15 +268,6 @@ def wine_stock():
                       .all())
     last_sold_map = {r[0]: r[1] for r in last_sold_rows}
 
-    # ── FIXED N+1: one GROUP BY for invoice counts (was N WinePurchase.count() queries) ──
-    inv_count_rows = (db.session.query(WinePurchase.wine_id,
-                                       db.func.count(WinePurchase.id))
-                      .filter(WinePurchase.is_invoice_cleared == True,
-                              WinePurchase.invoice_image_path.isnot(None))
-                      .group_by(WinePurchase.wine_id)
-                      .all())
-    invoice_counts = {r[0]: int(r[1] or 0) for r in inv_count_rows}
-
     # Build wines_data with zero per-wine DB queries
     wines_data = []
     for w in wines:
@@ -325,7 +275,6 @@ def wine_stock():
         d = w.to_dict()
         d['monthly_sold'] = monthly_sold_by_wine.get(w.id, 0)
         d['last_sold_date'] = last_date.strftime('%d %b') if last_date else 'Never'
-        d['invoice_count'] = invoice_counts.get(w.id, 0)
         wines_data.append(d)
 
     week_comps_total = sum(d['total_comps'] for d in weekly_comps_data)
@@ -336,7 +285,6 @@ def wine_stock():
                            weekly_data=weekly_data,
                            weekly_comps_data=weekly_comps_data,
                            week_comps_total=week_comps_total,
-                           pending_purchases=pending_purchases,
                            low_stock_wines=low_stock_wines,
                            kpis=kpis,
                            today=today.isoformat(),
@@ -436,120 +384,30 @@ def record_comp():
 @app.route('/api/wine/purchase', methods=['POST'])
 @login_required
 def record_purchase():
-    """Record a wine purchase order. Does NOT add to stock until invoice is cleared."""
+    """Record a wine purchase order."""
     data = request.get_json()
     wine_id = data.get('wine_id')
-    quantity = data.get('quantity', 1)
+    boxes = data.get('quantity', 1)
     order_date = data.get('date', date.today().isoformat())
 
     wine = Wine.query.get_or_404(wine_id)
+    total_wines = int(boxes) * wine.wines_per_box
 
     purchase = WinePurchase(
         wine_id=wine_id,
-        quantity_ordered=quantity,
+        quantity_ordered=total_wines,
         date_ordered=datetime.strptime(order_date, '%Y-%m-%d').date()
     )
+    wine.current_stock_qty = round(wine.current_stock_qty + total_wines, 4)
     db.session.add(purchase)
-    db.session.commit()
-
-    return jsonify({'success': True, 'purchase': purchase.to_dict()})
-
-
-@app.route('/api/wine/clear-invoice/<int:purchase_id>', methods=['POST'])
-@login_required
-def clear_invoice(purchase_id):
-    """
-    Mark a purchase invoice as cleared.
-    REQUIRES: A photo/scan of the invoice uploaded as multipart form field 'invoice_image'.
-    CRITICAL: This is the ONLY place where purchased quantity gets added to Wine.current_stock_qty.
-    """
-    purchase = WinePurchase.query.get_or_404(purchase_id)
-
-    if purchase.is_invoice_cleared:
-        return jsonify({'error': 'Invoice already cleared'}), 400
-
-    # Require invoice image
-    if 'invoice_image' not in request.files:
-        return jsonify({'error': 'Invoice image is required to clear this invoice.'}), 400
-
-    file = request.files['invoice_image']
-    if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({'error': 'Please upload a valid image or PDF (jpg, png, gif, pdf, webp).'}), 400
-
-    # Save file with unique name — compress images using Pillow
-    ext = file.filename.rsplit('.', 1)[1].lower()
-    is_image = ext in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'}
-
-    if is_image:
-        # Always save compressed images as JPEG
-        unique_name = f"invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.jpg"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        try:
-            img = Image.open(file.stream)
-            # Convert to RGB (handles RGBA, palette, HEIC, etc.)
-            if img.mode not in ('RGB', 'L'):
-                img = img.convert('RGB')
-            # Resize if wider than 1200px, maintain aspect ratio
-            max_width = 1200
-            if img.width > max_width:
-                ratio = max_width / img.width
-                new_size = (max_width, int(img.height * ratio))
-                img = img.resize(new_size, Image.LANCZOS)
-            # Save compressed JPEG (quality 75 — good quality, ~80% smaller)
-            img.save(save_path, format='JPEG', quality=75, optimize=True)
-        except Exception as compress_err:
-            # Fall back to saving the original if Pillow fails
-            app.logger.warning(f'Pillow compression failed: {compress_err}, saving original')
-            file.seek(0)
-            file.save(save_path)
-    else:
-        # PDFs saved as-is
-        unique_name = f"invoice_{purchase_id}_{uuid.uuid4().hex[:8]}.{ext}"
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_name)
-        file.save(save_path)
-
-    purchase.invoice_image_path = f"uploads/invoices/{unique_name}"
-    purchase.invoice_image_original = secure_filename(file.filename)
-    purchase.is_invoice_cleared = True
-    purchase.date_cleared = datetime.utcnow()
-
-    # NOW add to stock (whole bottles purchased)
-    wine = Wine.query.get(purchase.wine_id)
-    wine.current_stock_qty = round(wine.current_stock_qty + purchase.quantity_ordered, 4)
-
     db.session.commit()
 
     return jsonify({
         'success': True,
+        'purchase': purchase.to_dict(),
         'new_stock': wine.current_stock_qty,
-        'stock_display': wine.stock_display,
-        'purchase': purchase.to_dict()
+        'stock_display': wine.stock_display
     })
-
-
-@app.route('/api/wine/<int:wine_id>/invoices')
-@login_required
-def get_wine_invoices(wine_id):
-    """Get all cleared invoices with images for a wine."""
-    purchases = WinePurchase.query.filter_by(
-        wine_id=wine_id,
-        is_invoice_cleared=True
-    ).filter(
-        WinePurchase.invoice_image_path.isnot(None)
-    ).order_by(WinePurchase.date_cleared.desc()).all()
-
-    invoices = []
-    for p in purchases:
-        invoices.append({
-            'id': p.id,
-            'date_ordered': p.date_ordered.isoformat(),
-            'date_cleared': p.date_cleared.isoformat() if p.date_cleared else None,
-            'quantity_ordered': p.quantity_ordered,
-            'image_url': f"/static/{p.invoice_image_path}",
-            'image_original': p.invoice_image_original,
-        })
-
-    return jsonify({'invoices': invoices, 'wine_id': wine_id})
 
 
 @app.route('/api/monthly-report-data')
@@ -713,6 +571,7 @@ def update_wine(wine_id):
     wine.name = data.get('name', wine.name)
     wine.supplier_id = data.get('supplier_id', wine.supplier_id)
     wine.cost_price = float(data.get('cost_price', wine.cost_price))
+    wine.wines_per_box = int(data.get('wines_per_box', wine.wines_per_box))
     wine.glasses_per_bottle = int(data.get('glasses_per_bottle', wine.glasses_per_bottle))
     wine.target_margin_percent = float(data.get('target_margin_percent', wine.target_margin_percent))
     wine.minimum_stock_threshold = int(data.get('minimum_stock_threshold', wine.minimum_stock_threshold))
@@ -734,6 +593,7 @@ def add_wine():
         name=data['name'],
         supplier_id=data.get('supplier_id'),
         cost_price=float(data.get('cost_price', 0)),
+        wines_per_box=int(data.get('wines_per_box', 6)),
         glasses_per_bottle=int(data.get('glasses_per_bottle', 5)),
         target_margin_percent=float(data.get('target_margin_percent', 70)),
         minimum_stock_threshold=int(data.get('minimum_stock_threshold', 3)),

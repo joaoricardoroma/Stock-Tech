@@ -258,6 +258,7 @@ def seed_wines(supplier_map):
                 name=w_data['name'],
                 supplier_id=supplier_map.get(w_data['supplier']),
                 cost_price=w_data['cost_price'],
+                wines_per_box=6,
                 glasses_per_bottle=w_data['glasses'],
                 target_margin_percent=w_data['margin'],
                 minimum_stock_threshold=3,
@@ -364,7 +365,7 @@ def seed_sales_and_comps():
 
 
 def seed_purchases():
-    """Create sample purchase data including some pending invoices."""
+    """Create sample purchase data."""
     if WinePurchase.query.count() > 0:
         print("✓ Purchase data already exists, skipping")
         return
@@ -372,7 +373,7 @@ def seed_purchases():
     today = date.today()
     wines = Wine.query.all()
 
-    # Create cleared purchases (past 2 weeks)
+    # Create past purchases
     for day_offset in range(14, 2, -3):
         purchase_date = today - timedelta(days=day_offset)
         num_purchases = random.randint(2, 5)
@@ -383,13 +384,12 @@ def seed_purchases():
                 wine_id=wine.id,
                 date_ordered=purchase_date,
                 quantity_ordered=qty,
-                is_invoice_cleared=True
             )
-            # NOTE: cleared purchases already added to stock via current_stock_qty in seed,
+            # NOTE: purchases already added to stock via current_stock_qty in seed,
             # so we don't double-add here — these are just historical records.
             db.session.add(purchase)
 
-    # Create some pending purchases (recent — not yet cleared)
+    # Create recent purchases
     for _ in range(4):
         wine = random.choice(wines)
         qty = random.randint(6, 18)
@@ -397,12 +397,11 @@ def seed_purchases():
             wine_id=wine.id,
             date_ordered=today - timedelta(days=random.randint(0, 2)),
             quantity_ordered=qty,
-            is_invoice_cleared=False
         )
         db.session.add(purchase)
 
     db.session.commit()
-    print(f"✓ Created sample purchase records (cleared + pending invoices)")
+    print(f"✓ Created sample purchase records")
 
 def seed_bar_suppliers():
     bar_supplier_names = ['Connalty', 'Celtic Whiskey']

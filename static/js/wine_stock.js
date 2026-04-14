@@ -413,7 +413,7 @@ async function submitPurchase() {
 
         const data = await resp.json();
         if (data.success) {
-            showToast('Purchase recorded! Invoice pending.', 'success');
+            showToast(`Purchase recorded! Stock updated to ${data.stock_display}.`, 'success');
             closeModal('addPurchaseModal');
             setTimeout(() => location.reload(), 1200);
         } else {
@@ -432,6 +432,7 @@ async function submitNewWine() {
         name,
         supplier_id: document.getElementById('newWineSupplier').value || null,
         cost_price: document.getElementById('newWineCost').value,
+        wines_per_box: document.getElementById('newWineWinesPerBox') ? document.getElementById('newWineWinesPerBox').value : 6,
         glasses_per_bottle: document.getElementById('newWineGlasses').value,
         target_margin_percent: document.getElementById('newWineMargin').value,
         minimum_stock_threshold: document.getElementById('newWineThreshold').value,
@@ -502,6 +503,7 @@ async function editWine(wineId) {
         document.getElementById('editWineName').value = wine.name;
         document.getElementById('editWineSupplier').value = wine.supplier_id || '';
         document.getElementById('editWineCost').value = wine.cost_price;
+        if(document.getElementById('editWineWinesPerBox')) document.getElementById('editWineWinesPerBox').value = wine.wines_per_box;
         document.getElementById('editWineGlasses').value = wine.glasses_per_bottle;
         document.getElementById('editWineMargin').value = wine.target_margin_percent;
         document.getElementById('editWineThreshold').value = wine.minimum_stock_threshold;
@@ -519,6 +521,7 @@ async function submitEditWine() {
         name: document.getElementById('editWineName').value,
         supplier_id: document.getElementById('editWineSupplier').value || null,
         cost_price: document.getElementById('editWineCost').value,
+        wines_per_box: document.getElementById('editWineWinesPerBox') ? document.getElementById('editWineWinesPerBox').value : 6,
         glasses_per_bottle: document.getElementById('editWineGlasses').value,
         target_margin_percent: document.getElementById('editWineMargin').value,
         minimum_stock_threshold: document.getElementById('editWineThreshold').value,
@@ -545,141 +548,7 @@ async function submitEditWine() {
     }
 }
 
-// ===================================================================
-// Invoice: open upload modal
-// ===================================================================
-function openClearInvoiceModal(purchaseId, wineName, qty) {
-    document.getElementById('clearInvoicePurchaseId').value = purchaseId;
-    document.getElementById('clearInvoiceDesc').textContent =
-        `Upload the invoice photo for: ${wineName} (${qty} bottles)`;
-    document.getElementById('invoicePreview').style.display = 'none';
-    document.getElementById('uploadPlaceholder').style.display = 'flex';
-    document.getElementById('invoiceImageInput').value = '';
-    openModal('clearInvoiceModal');
-}
-
-function previewInvoiceImage(input) {
-    const file = input.files[0];
-    if (!file) return;
-
-    const preview = document.getElementById('invoicePreview');
-    const placeholder = document.getElementById('uploadPlaceholder');
-
-    if (file.type === 'application/pdf') {
-        placeholder.innerHTML = `
-            <i class="fas fa-file-pdf" style="font-size:48px; color:var(--accent-red); margin-bottom:10px;"></i>
-            <p style="font-weight:600;">${file.name}</p>
-            <p style="font-size:12px; color:var(--text-muted);">PDF ready to upload</p>
-        `;
-        placeholder.style.display = 'flex';
-        preview.style.display = 'none';
-    } else {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            preview.src = e.target.result;
-            preview.style.display = 'block';
-            placeholder.style.display = 'none';
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-async function submitClearInvoice() {
-    const purchaseId = document.getElementById('clearInvoicePurchaseId').value;
-    const fileInput = document.getElementById('invoiceImageInput');
-    const btn = document.getElementById('submitClearInvoiceBtn');
-
-    if (!fileInput.files[0]) {
-        showToast('Please take a photo or upload the invoice first.', 'warning');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-
-    const formData = new FormData();
-    formData.append('invoice_image', fileInput.files[0]);
-
-    try {
-        const resp = await fetch(`/api/wine/clear-invoice/${purchaseId}`, {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await resp.json();
-        if (data.success) {
-            showToast(`Invoice cleared! Stock updated to ${data.stock_display}`, 'success');
-            closeModal('clearInvoiceModal');
-            setTimeout(() => location.reload(), 1200);
-        } else {
-            showToast(data.error || 'Failed to clear invoice', 'danger');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-check"></i> Confirm & Add to Stock';
-        }
-    } catch (err) {
-        showToast('Network error', 'danger');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-check"></i> Confirm & Add to Stock';
-    }
-}
-
-// ===================================================================
-// Invoice Gallery
-// ===================================================================
-async function openInvoiceGallery(wineId, wineName) {
-    document.getElementById('galleryWineName').textContent = wineName;
-    const grid = document.getElementById('invoiceGalleryGrid');
-    grid.innerHTML = '<div style="text-align:center; padding: 32px; color: var(--text-muted);"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
-    openModal('invoiceGalleryModal');
-
-    try {
-        const resp = await fetch(`/api/wine/${wineId}/invoices`);
-        const data = await resp.json();
-        const invoices = data.invoices;
-
-        if (!invoices || invoices.length === 0) {
-            grid.innerHTML = `
-                <div style="text-align:center; padding:40px; color: var(--text-muted);">
-                    <i class="fas fa-receipt" style="font-size:48px; margin-bottom:16px; opacity:0.3;"></i>
-                    <p>No invoices with images yet.</p>
-                    <p style="font-size:12px;">Clear a pending invoice with a photo to see it here.</p>
-                </div>`;
-            return;
-        }
-
-        grid.innerHTML = invoices.map(inv => {
-            const isPdf = inv.image_url.endsWith('.pdf');
-            const thumbnail = isPdf
-                ? `<div class="invoice-thumb-placeholder"><i class="fas fa-file-pdf"></i></div>`
-                : `<img src="${inv.image_url}" alt="Invoice" class="invoice-thumb-img" onclick="window.open('${inv.image_url}', '_blank')"/>`;
-
-            const dateOrdered = new Date(inv.date_ordered).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
-            const dateCleared = inv.date_cleared ? new Date(inv.date_cleared).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : 'N/A';
-
-            return `
-                <div class="invoice-gallery-card">
-                    <div class="invoice-thumb">${thumbnail}</div>
-                    <div class="invoice-meta">
-                        <div class="invoice-meta-row">
-                            <i class="fas fa-calendar-alt"></i> Ordered: ${dateOrdered}
-                        </div>
-                        <div class="invoice-meta-row">
-                            <i class="fas fa-check-circle" style="color:var(--accent-green);"></i> Cleared: ${dateCleared}
-                        </div>
-                        <div class="invoice-meta-row">
-                            <i class="fas fa-wine-bottle"></i> ${inv.quantity_ordered} bottles
-                        </div>
-                    </div>
-                    <a href="${inv.image_url}" download="${inv.image_original || 'invoice.jpg'}" class="btn-glass" style="width:100%;text-align:center;font-size:12px;padding:8px;">
-                        <i class="fas fa-download"></i> Download
-                    </a>
-                </div>
-            `;
-        }).join('');
-    } catch (err) {
-        grid.innerHTML = `<div style="color:var(--accent-red); padding:24px;"><i class="fas fa-exclamation-circle"></i> Failed to load invoices.</div>`;
-    }
-}
+// Invoice functionality removed as part of DB migration.
 
 // ===================================================================
 // Weekly PDF Download

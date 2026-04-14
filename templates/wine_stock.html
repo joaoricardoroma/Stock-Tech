@@ -172,7 +172,7 @@
 <!-- ================================================================== -->
 <!-- SECTION 4: WINE PURCHASING & ALERTS                                -->
 <!-- ================================================================== -->
-{% if low_stock_wines or pending_purchases %}
+{% if low_stock_wines %}
 <section class="dashboard-section animate-in animate-delay-3" id="sectionAlerts">
     <div class="section-header">
         <h2 class="section-title">
@@ -233,28 +233,6 @@
                 <i class="fas fa-clock"></i> Cutoff: {{ wine.supplier.delivery_cutoff_time }} for next-day delivery
             </div>
             {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if pending_purchases %}
-    <div class="alert-subtitle" style="margin-top: 28px;"><i class="fas fa-file-invoice"></i> Pending Invoices</div>
-    <div class="pending-invoices-list">
-        {% for purchase in pending_purchases %}
-        <div class="pending-invoice-row" id="pendingInvoice{{ purchase.id }}">
-            <div class="invoice-wine-info">
-                <span class="invoice-wine-name">{{ purchase.wine.name }}</span>
-                <span class="invoice-date">Ordered {{ purchase.date_ordered.strftime('%d %b %Y') }}</span>
-            </div>
-            <div class="invoice-qty">
-                <span class="qty-badge">+{{ purchase.quantity_ordered }}</span>
-            </div>
-            <button class="btn-clear-invoice"
-                    onclick="openClearInvoiceModal({{ purchase.id }}, '{{ purchase.wine.name }}', {{ purchase.quantity_ordered }})"
-                    id="clearInvoiceBtn{{ purchase.id }}">
-                <i class="fas fa-camera"></i> Clear Invoice
-            </button>
         </div>
         {% endfor %}
     </div>
@@ -341,7 +319,6 @@
                     <th onclick="sortTable(6)" class="sortable th-num" id="thNetVat">NET VAT <i class="fas fa-sort"></i></th>
                     <th onclick="sortTable(7)" class="sortable th-num" id="thRetail">Retail Price <i class="fas fa-sort"></i></th>
                     <th onclick="sortTable(8)" class="sortable th-num" id="thStock">Stock <i class="fas fa-sort"></i></th>
-                    <th id="thInvoices">Invoices</th>
                     <th id="thActions">Actions</th>
                 </tr>
             </thead>
@@ -369,14 +346,6 @@
                         </span>
                     </td>
                     <td class="td-actions">
-                        <button class="btn-table-action btn-invoice-gallery {% if wine.invoice_count == 0 %}btn-invoice-empty{% endif %}"
-                                onclick="openInvoiceGallery({{ wine.id }}, '{{ wine.name }}')"
-                                title="View Invoices ({{ wine.invoice_count }})" id="invoiceGalleryBtn{{ wine.id }}">
-                            <i class="fas fa-receipt"></i>
-                            {% if wine.invoice_count > 0 %}
-                            <span class="invoice-count-badge">{{ wine.invoice_count }}</span>
-                            {% endif %}
-                        </button>
                         <button class="btn-table-action" onclick="editWine({{ wine.id }})" title="Edit"
                                 id="editWineBtn{{ wine.id }}">
                             <i class="fas fa-pen"></i>
@@ -405,56 +374,38 @@
         </button>
     </div>
 
-    <div class="kpi-grid">
-        <div class="kpi-card" id="kpiStockValue">
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+        <div class="kpi-card" id="kpiStockValue" onclick="toggleStockBreakdown()" style="cursor: pointer; position: relative;">
             <div class="kpi-icon" style="background: var(--accent-blue-dim); color: var(--accent-blue);">
                 <i class="fas fa-boxes-stacked"></i>
             </div>
             <div class="kpi-info">
-                <span class="kpi-label">Total Stock Value</span>
+                <span class="kpi-label">Total Stock Value <i class="fas fa-chevron-down" style="font-size: 0.8em; margin-left: 5px;" id="stockExpandIcon"></i></span>
                 <span class="kpi-value" data-count="{{ kpis.total_stock_value }}">€0</span>
             </div>
-        </div>
-
-        <div class="kpi-card" id="kpiRevenue">
-            <div class="kpi-icon" style="background: var(--accent-green-dim); color: var(--accent-green);">
-                <i class="fas fa-euro-sign"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Monthly Revenue</span>
-                <span class="kpi-value" data-count="{{ kpis.total_revenue }}">€0</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiProfit">
-            <div class="kpi-icon" style="background: var(--accent-gold-dim); color: var(--accent-gold);">
-                <i class="fas fa-chart-line"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Monthly Profit</span>
-                <span class="kpi-value" data-count="{{ kpis.total_profit }}">€0</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiTopWine">
-            <div class="kpi-icon" style="background: var(--accent-wine-dim); color: var(--accent-wine);">
-                <i class="fas fa-trophy"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Top Performing Wine</span>
-                <span class="kpi-value-text">{{ kpis.top_wine }}</span>
-                <span class="kpi-sub">{{ kpis.top_wine_qty }} sold this month</span>
-            </div>
-        </div>
-
-        <div class="kpi-card" id="kpiMargin">
-            <div class="kpi-icon" style="background: var(--accent-amber-dim); color: var(--accent-amber);">
-                <i class="fas fa-percent"></i>
-            </div>
-            <div class="kpi-info">
-                <span class="kpi-label">Highest Margin Wine</span>
-                <span class="kpi-value-text">{{ kpis.highest_margin_wine }}</span>
-                <span class="kpi-sub">{{ kpis.highest_margin_pct }}% margin</span>
+            <div id="stockBreakdown" style="display: none; width: 100%; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <div style="font-size: 13px; color: var(--text-secondary); max-height: 200px; overflow-y: auto;">
+                    <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="padding-bottom: 8px;">Wine</th>
+                                <th style="padding-bottom: 8px; text-align: right;">Qty</th>
+                                <th style="padding-bottom: 8px; text-align: right;">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for wine in wines %}
+                            {% if wine.current_stock_qty > 0 %}
+                            <tr>
+                                <td style="padding: 4px 0; color: var(--text-main);">{{ wine.name }}</td>
+                                <td style="padding: 4px 0; text-align: right;">{{ wine.stock_display }}</td>
+                                <td style="padding: 4px 0; text-align: right;">€{{ '%.2f' | format(wine.stock_value) }}</td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -470,6 +421,20 @@
         </div>
     </div>
 </section>
+
+<script>
+function toggleStockBreakdown() {
+    const bd = document.getElementById('stockBreakdown');
+    const icon = document.getElementById('stockExpandIcon');
+    if (bd.style.display === 'none') {
+        bd.style.display = 'block';
+        icon.className = 'fas fa-chevron-up';
+    } else {
+        bd.style.display = 'none';
+        icon.className = 'fas fa-chevron-down';
+    }
+}
+</script>
 
 <!-- ================================================================== -->
 <!-- SECTION 6: SUPPLIERS DIRECTORY                                     -->
@@ -677,15 +642,18 @@
         <div class="modal-body">
             <div class="form-group-modal">
                 <label>Wine</label>
-                <select id="purchaseWineSelect" class="modal-input">
+                <select id="purchaseWineSelect" class="modal-input" onchange="updatePurchaseTotal()">
                     {% for wine in wines %}
-                    <option value="{{ wine.id }}">{{ wine.name }}</option>
+                    <option value="{{ wine.id }}" data-wpb="{{ wine.wines_per_box }}">{{ wine.name }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group-modal">
-                <label>Quantity Ordered</label>
-                <input type="number" id="purchaseQuantity" class="modal-input" value="6" min="1">
+                <label>Quantity Ordered (Boxes)</label>
+                <input type="number" id="purchaseQuantity" class="modal-input" value="1" min="1" oninput="updatePurchaseTotal()">
+            </div>
+            <div id="purchaseTotalFeedback" style="font-size: 13px; color: var(--accent-gold); margin-bottom: 10px; font-weight: 500;">
+                Total: 6 bottles will be added to stock.
             </div>
             <div class="form-group-modal">
                 <label>Date Ordered</label>
@@ -726,6 +694,10 @@
                 <div class="form-group-modal">
                     <label>Cost Price (€)</label>
                     <input type="number" id="newWineCost" class="modal-input" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group-modal">
+                    <label>Wines per Box</label>
+                    <input type="number" id="newWineWinesPerBox" class="modal-input" value="6" min="1">
                 </div>
                 <div class="form-group-modal">
                     <label>Glasses per Bottle</label>
@@ -779,6 +751,10 @@
                 <div class="form-group-modal">
                     <label>Cost Price (€)</label>
                     <input type="number" id="editWineCost" class="modal-input" step="0.01">
+                </div>
+                <div class="form-group-modal">
+                    <label>Wines per Box</label>
+                    <input type="number" id="editWineWinesPerBox" class="modal-input" min="1">
                 </div>
                 <div class="form-group-modal">
                     <label>Glasses per Bottle</label>
@@ -863,59 +839,25 @@
     </div>
 </div>
 
-<!-- Clear Invoice Modal (with photo upload) -->
-<div class="modal-overlay" id="clearInvoiceModal">
-    <div class="modal-glass">
-        <div class="modal-header">
-            <h3><i class="fas fa-camera" style="color: var(--accent-gold);"></i> Clear Invoice</h3>
-            <button class="modal-close" onclick="closeModal('clearInvoiceModal')"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <input type="hidden" id="clearInvoicePurchaseId">
-            <div style="text-align:center; margin-bottom: 16px;">
-                <p id="clearInvoiceDesc" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;"></p>
-                <div class="invoice-upload-zone" id="invoiceUploadZone" onclick="document.getElementById('invoiceImageInput').click()">
-                    <div class="upload-placeholder" id="uploadPlaceholder">
-                        <i class="fas fa-camera" style="font-size: 36px; color: var(--accent-gold); margin-bottom: 10px;"></i>
-                        <p style="font-weight: 600;">Tap to take photo or upload</p>
-                        <p style="font-size: 12px; color: var(--text-muted);">JPG, PNG, PDF, HEIC up to 16 MB</p>
-                    </div>
-                    <img id="invoicePreview" src="" alt="Invoice Preview"
-                         style="display:none; max-width:100%; max-height: 280px; border-radius: 10px; object-fit: contain;">
-                </div>
-                <input type="file" id="invoiceImageInput" accept="image/*,application/pdf"
-                       capture="environment" style="display:none;"
-                       onchange="previewInvoiceImage(this)">
-                <button class="btn-glass" style="margin-top: 10px; font-size: 12px;"
-                        onclick="document.getElementById('invoiceImageInput').click()" id="changePhotoBtn">
-                    <i class="fas fa-redo"></i> Change Photo
-                </button>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn-glass" onclick="closeModal('clearInvoiceModal')">Cancel</button>
-            <button class="btn-accent" onclick="submitClearInvoice()" id="submitClearInvoiceBtn">
-                <i class="fas fa-check"></i> Confirm &amp; Add to Stock
-            </button>
-        </div>
     </div>
 </div>
 
-<!-- Invoice Gallery Modal -->
-<div class="modal-overlay" id="invoiceGalleryModal">
-    <div class="modal-glass modal-lg">
-        <div class="modal-header">
-            <h3><i class="fas fa-receipt" style="color: var(--accent-gold);"></i>
-                Invoices — <span id="galleryWineName"></span></h3>
-            <button class="modal-close" onclick="closeModal('invoiceGalleryModal')"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            <div id="invoiceGalleryGrid" class="invoice-gallery-grid">
-                <!-- Populated by JS -->
-            </div>
-        </div>
-    </div>
-</div>
+<script>
+function updatePurchaseTotal() {
+    const sel = document.getElementById('purchaseWineSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const wpb = parseInt(opt.dataset.wpb) || 6;
+    const qty = parseInt(document.getElementById('purchaseQuantity').value) || 0;
+    const total = wpb * qty;
+    document.getElementById('purchaseTotalFeedback').textContent = `Total: ${total} bottles will be added to stock.`;
+}
+// Init the message on first load
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('purchaseWineSelect')) {
+        updatePurchaseTotal();
+    }
+});
+</script>
 
 <!-- Weekly data JSON for JS -->
 <script id="weeklyDataJSON" type="application/json">{{ weekly_data | tojson | safe }}</script>

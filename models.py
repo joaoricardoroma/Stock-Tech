@@ -72,6 +72,7 @@ class Wine(db.Model):
     target_margin_percent = db.Column(db.Float, nullable=False, default=70.0)
     net_vat_price = db.Column(db.Float, nullable=True)  # calculated: cost_price * (1 + margin)
     retail_price = db.Column(db.Float, nullable=True)    # net_vat_price * 1.23 (23% VAT)
+    wines_per_box = db.Column(db.Integer, nullable=False, default=6)
     minimum_stock_threshold = db.Column(db.Integer, nullable=False, default=3)
     # Now Float to support fractional bottles (glass sales deduct 1/glasses_per_bottle)
     current_stock_qty = db.Column(db.Float, nullable=False, default=0.0)
@@ -129,6 +130,7 @@ class Wine(db.Model):
             'cost_price': self.cost_price,
             'glasses_per_bottle': self.glasses_per_bottle,
             'target_margin_percent': self.target_margin_percent,
+            'wines_per_box': self.wines_per_box,
             'net_vat_price': self.net_vat_price,
             'retail_price': self.retail_price,
             'minimum_stock_threshold': self.minimum_stock_threshold,
@@ -198,10 +200,7 @@ class WineComp(db.Model):
 class WinePurchase(db.Model):
     """
     Record of wine purchased / ordered from supplier.
-
-    CRITICAL RULE: Purchased wine is tracked here. It shows as a "Plus"
-    in the weekly sales/orders view, but it MUST NOT be added to
-    Wine.current_stock_qty until is_invoice_cleared is True.
+    Purchased wine is added directly to Wine.current_stock_qty when recorded.
     """
     __tablename__ = 'wine_purchases'
 
@@ -209,15 +208,10 @@ class WinePurchase(db.Model):
     wine_id = db.Column(db.Integer, db.ForeignKey('wines.id'), nullable=False)
     date_ordered = db.Column(db.Date, nullable=False, default=datetime.utcnow)
     quantity_ordered = db.Column(db.Integer, nullable=False, default=1)
-    is_invoice_cleared = db.Column(db.Boolean, nullable=False, default=False)
-    date_cleared = db.Column(db.DateTime, nullable=True)
-    invoice_image_path = db.Column(db.String(500), nullable=True)       # stored file path
-    invoice_image_original = db.Column(db.String(300), nullable=True)   # original filename
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        status = "CLEARED" if self.is_invoice_cleared else "PENDING"
-        return f'<WinePurchase {self.wine.name if self.wine else "?"} x{self.quantity_ordered} [{status}]>'
+        return f'<WinePurchase {self.wine.name if self.wine else "?"} x{self.quantity_ordered}>'
 
     def to_dict(self):
         return {
@@ -226,10 +220,6 @@ class WinePurchase(db.Model):
             'wine_name': self.wine.name if self.wine else 'N/A',
             'date_ordered': self.date_ordered.isoformat(),
             'quantity_ordered': self.quantity_ordered,
-            'is_invoice_cleared': self.is_invoice_cleared,
-            'date_cleared': self.date_cleared.isoformat() if self.date_cleared else None,
-            'invoice_image_path': self.invoice_image_path,
-            'invoice_image_original': self.invoice_image_original,
         }
 
 
